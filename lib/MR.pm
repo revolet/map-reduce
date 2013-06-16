@@ -12,7 +12,18 @@ our $INFO  = 1;
 our $NONE  = 0;
 
 # Enable / disable logging.
-our $LOGGING = $NONE;
+our $LOGGING = $ENV{MR_LOGGING} // $NONE;
+
+sub debug { shift->log('DEBUG', @_) if $LOGGING >= $DEBUG }
+sub info  { shift->log('INFO',  @_) if $LOGGING >= $INFO  }
+
+sub log {
+    my ($class, $level, $format, @args) = @_;
+
+    $format //= '';
+    
+    printf STDERR $level.': '.$format."\n", map { defined $_ ? $_ : 'undef' } @args;
+}
 
 has [ qw( name mapper reducer ) ] => (
     is       => 'ro',
@@ -25,9 +36,6 @@ has redis => (
     default  => sub { Redis::hiredis->new(utf8 => 0) },
 );
 
-sub debug { shift; print STDERR 'DEBUG: ', @_, "\n" if $LOGGING >= $DEBUG }
-sub info  { shift; print STDERR 'INFO: ',  @_, "\n" if $LOGGING >= $INFO  }
-
 sub input {
     my ($self, $input) = @_;
     
@@ -38,7 +46,7 @@ sub input {
     
     $redis->lpush( $self->name.'-input', nfreeze($input) );
     
-    MR->debug( "Pushed input '${$input}{key}' => '${$input}{value}'to ".$self->name."-input." );
+    MR->debug( "Pushed input '%s' => '%s' to %s->input.", $input->{key}, $input->{value}, $self->name );
     
     return $self;
 }
@@ -51,8 +59,8 @@ sub run {
     my $reducer = $deparse->coderef2text( $self->reducer );
     my $redis   = $self->redis;
     
-    MR->debug( "Mapper is '$mapper'" );
-    MR->debug( "Reducer is '$reducer'" );
+    MR->debug( "Mapper is '%s'",  $mapper );
+    MR->debug( "Reducer is '%s'", $reducer );
     
     $redis->hset( mapper  => ( $self->name => $mapper  ) );
     $redis->hset( reducer => ( $self->name => $reducer ) );
@@ -66,11 +74,11 @@ sub done {
     my $redis = $self->redis;
     my $name  = $self->name;
     
-    return $redis->llen( $name.'-input'    ) == 0
-        && $redis->llen( $name.'-mapping'  ) == 0
-        && $redis->llen( $name.'-mapped'   ) == 0
-        && $redis->llen( $name.'-reducing' ) == 0
-        && $redis->llen( $name.'-reduced'  ) == 0
+    return !$redis->llen( $name.'-input'    )
+        && !$redis->llen( $name.'-mapped'   )
+        && !$redis->llen( $name.'-reduced'  )
+        && !$redis->get(  $name.'-mapping'  )
+        && !$redis->get(  $name.'-reducing' )
     ;
 }
 sub next_result {
@@ -82,11 +90,11 @@ sub next_result {
     while (1) {
         return undef if $self->done;
 
-        MR->debug( "Input queue: "    . $redis->llen( $name.'-input'    ) );
-        MR->debug( "Mapping queue: "  . $redis->llen( $name.'-mapping'  ) );
-        MR->debug( "Mapped queue: "   . $redis->llen( $name.'-mapped'   ) );
-        MR->debug( "Reducing queue: " . $redis->llen( $name.'-reducing' ) );
-        MR->debug( "Reduced queue: "  . $redis->llen( $name.'-reduced'  ) );
+        MR->debug( "Input queue:   %s", $redis->llen( $name.'-input'    ) );
+        MR->debug( "Mapped queue:  %s", $redis->llen( $name.'-mapped'   ) );
+        MR->debug( "Reduced queue: %s", $redis->llen( $name.'-reduced'  ) );
+        MR->debug( "Mapping?:      %s", $redis->get(  $name.'-mapping'  ) );
+        MR->debug( "Reducing?:     %s", $redis->get(  $name.'-reducing' ) );
 
         my $reduced = $redis->brpop( $self->name.'-reduced', 1);
         

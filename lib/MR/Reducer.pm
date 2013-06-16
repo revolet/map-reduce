@@ -48,7 +48,7 @@ sub _run {
             if ( !$reducer{$name} ) {
                 my $code = $redis->hget( reducer => $name );
                 
-                MR->debug( "Got reducer for $name: $code" );
+                MR->debug( "Got reducer for %s: %s", $name, $code );
                 
                 local $@;
                 
@@ -70,19 +70,20 @@ sub _run_reducer {
 
     my $redis = $self->redis;
     
+    return if $redis->llen( $name.'-mapped' ) == 0;
+    
+    $redis->set( $name.'-reducing', 1 );
+    
     my @values;
-    my @mapped;
     
     while (1) {
-        my $mapped = $redis->rpoplpush( $name.'-mapped', $name.'-reducing' );
+        my $mapped = $redis->rpop( $name.'-mapped' );
 
         last if !defined $mapped;    
         
-        push @mapped, $mapped;
-        
         my $value = thaw($mapped);
     
-        MR->debug( "Got mapped '$$value{key}' => '$$value{value}'" );
+        MR->debug( "Got mapped '%s' => '%s'", $value->{key}, $value->{value} );
         
         push @values, $value;
     }
@@ -90,15 +91,14 @@ sub _run_reducer {
     if (@values > 0) {
         my $reduced = $reducer->(\@values);
         
-        MR->debug( "Reduced is '$$_{key}' => '$$_{value}'" )
+        MR->debug( "Reduced is '%s' => '%s'", $_->{key}, $_->{value} )
             for @$reduced;
 
         $redis->lpush( $name.'-reduced', nfreeze($_) )
             for @$reduced;
     }
     
-    $redis->lrem( $name.'-reducing', 1, $_ )
-        for @mapped;
+    $redis->set( $name.'-reducing', 0 );
 }
 
 sub DESTROY {

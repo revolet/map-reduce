@@ -47,7 +47,7 @@ sub _run {
             if ( !$mapper{$name} ) {
                 my $code = $redis->hget( mapper => $name );
                 
-                MR->debug( "Got mapper for $name: $code" );
+                MR->debug( "Got mapper for %s: %s", $name, $code );
                 
                 local $@;
                 
@@ -69,24 +69,31 @@ sub _run_mapper {
     
     my $redis = $self->redis;
     
-    my $input = $redis->rpoplpush( $name.'-input', $name.'-mapping' );
+    return if $redis->llen( $name.'-input' ) == 0;
     
-    return if !defined $input;
+    $redis->set( $name.'-mapping', 1 );
+    
+    my $input = $redis->rpop( $name.'-input' );
+    
+    if (!defined $input) {
+        $redis->set( $name.'-mapping', 0);
+        return;
+    }
     
     my $value = thaw($input);
     
-    MR->debug( "Got input '$$value{key}' => '$$value{value}'" );
+    MR->debug( "Got input '%s' => '%s'", $value->{key}, $value->{value} );
     
     die 'Mapper is undefined? for ' . $$
         if !defined $mapper;
     
     my $mapped = $mapper->($value);
     
-    MR->debug( "Mapped is '$$mapped{key}' => '$$mapped{key}'" );
+    MR->debug( "Mapped is '%s' => '%s'", $mapped->{key}, $mapped->{value} );
     
     $redis->lpush( $name.'-mapped', nfreeze($mapped) );
     
-    $redis->lrem( $name.'-mapping', 1, $input );
+    $redis->set( $name.'-mapping', 0 );
 }
 
 sub DESTROY {
