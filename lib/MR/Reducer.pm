@@ -32,14 +32,14 @@ sub run {
     push @pids, $pid;
 }
 
-my %reducer;
-
 sub _run {
     my ($self) = @_;
     
     MR->info( "Reducer $$ started." );
     
     my $redis = $self->redis;
+    
+    my %reducer;
     
     while (1) {
         my $names = $redis->hkeys('reducer');
@@ -97,7 +97,7 @@ sub _run_reducer {
         $redis->lpush( $name.'-reduced', nfreeze($_) )
             for @$reduced;
     }
-    
+
     $redis->set( $name.'-reducing', 0 );
 }
 

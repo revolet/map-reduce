@@ -1,6 +1,7 @@
 package MR::Mapper;
 use Moo;
 use Storable qw(nfreeze thaw);
+use Time::HiRes qw(sleep);
 
 has pid => (
     is => 'rw',
@@ -31,14 +32,14 @@ sub run {
     push @pids, $pid;
 }
 
-my %mapper;
-
 sub _run {
     my ($self) = @_;
     
     MR->info( "Mapper $$ started." );
     
     my $redis = $self->redis;
+    
+    my %mapper;
     
     while (1) {
         my $names = $redis->hkeys('mapper');
@@ -89,9 +90,12 @@ sub _run_mapper {
     
     my $mapped = $mapper->($value);
     
-    MR->debug( "Mapped is '%s' => '%s'", $mapped->{key}, $mapped->{value} );
+    if (defined $mapped && defined $mapped->{key}) {
+        $redis->lpush( $name.'-mapped', nfreeze($mapped) );
+    }
     
-    $redis->lpush( $name.'-mapped', nfreeze($mapped) );
+    MR->debug( "Mapped is '%s' => '%s'", $mapped->{key}, $mapped->{value} );
+
     
     $redis->set( $name.'-mapping', 0 );
 }
