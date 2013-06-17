@@ -1,17 +1,12 @@
 package MR::Reducer;
 use Moo;
-use Redis::hiredis;
 use Storable qw(nfreeze thaw);
 
 has pid => (
     is => 'rw',
 );
 
-has redis => (
-    is       => 'ro',
-    lazy     => 1,
-    default  => sub { Redis::hiredis->new(utf8 => 0) },
-);
+with 'MR::Redis';
 
 my @pids;
 
@@ -21,9 +16,6 @@ sub run {
     my $pid = fork;
     
     if ($pid == 0) {
-        $self->redis->connect('127.0.0.1', 6379);
-        $self->redis->select(9);
-
         $self->_run();
         exit 0;
     }
@@ -83,15 +75,15 @@ sub _run_reducer {
         
         my $value = thaw($mapped);
     
-        MR->debug( "Got mapped '%s' => '%s'", $value->{key}, $value->{value} );
+        MR->debug( "Got mapped '%s'", $value->{key} );
         
         push @values, $value;
     }
     
     if (@values > 0) {
-        my $reduced = $reducer->(\@values);
+        my $reduced = $reducer->($self, \@values);
         
-        MR->debug( "Reduced is '%s' => '%s'", $_->{key}, $_->{value} )
+        MR->debug( "Reduced is '%s'", $_->{key} )
             for @$reduced;
 
         $redis->lpush( $name.'-reduced', nfreeze($_) )

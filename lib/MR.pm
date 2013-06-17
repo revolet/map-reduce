@@ -30,30 +30,9 @@ has [ qw( name mapper reducer ) ] => (
     required => 1,
 );
 
-has redis => (
-    is       => 'ro',
-    lazy     => 1,
-    default  => sub { Redis::hiredis->new(utf8 => 0) },
-);
+with 'MR::Redis';
 
-sub input {
-    my ($self, $input) = @_;
-    
-    my $redis = $self->redis;
-    
-    if (!eval { $redis->ping eq 'PONG' }) {
-        $redis->connect('127.0.0.1', 6379);
-        $redis->select(9);
-    }
-    
-    $redis->lpush( $self->name.'-input', nfreeze($input) );
-    
-    MR->debug( "Pushed input '%s' => '%s' to %s->input.", $input->{key}, $input->{value}, $self->name );
-    
-    return $self;
-}
-
-sub run {
+sub BUILD {
     my ($self) = @_;
     
     my $deparse = B::Deparse->new();
@@ -66,6 +45,16 @@ sub run {
     
     $redis->hset( mapper  => ( $self->name => $mapper  ) );
     $redis->hset( reducer => ( $self->name => $reducer ) );
+}
+
+sub input {
+    my ($self, $input) = @_;
+    
+    my $redis = $self->redis;
+    
+    $redis->lpush( $self->name.'-input', nfreeze($input) );
+    
+    MR->debug( "Pushed input '%s' to %s->input.", $input->{key}, $self->name );
     
     return $self;
 }
@@ -110,6 +99,20 @@ sub next_result {
         
         return $value;
     }
+}
+
+sub all_results {
+    my ($self) = @_;
+    
+    my @results;
+    
+    while (!$self->done) {
+        my $result = $self->next_result;
+        next if !defined $result;
+        push @results, $result;
+    }
+    
+    return \@results;
 }
 
 1;

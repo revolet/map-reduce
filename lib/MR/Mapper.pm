@@ -7,11 +7,7 @@ has pid => (
     is => 'rw',
 );
 
-has redis => (
-    is       => 'ro',
-    lazy     => 1,
-    default  => sub { Redis::hiredis->new(utf8 => 0) },
-);
+with 'MR::Redis';
 
 my @pids;
 
@@ -21,9 +17,6 @@ sub run {
     my $pid = fork;
     
     if ($pid == 0) {
-        $self->redis->connect('127.0.0.1', 6379);
-        $self->redis->select(9);
-        
         $self->_run();
         exit 0;
     }
@@ -83,18 +76,18 @@ sub _run_mapper {
     
     my $value = thaw($input);
     
-    MR->debug( "Got input '%s' => '%s'", $value->{key}, $value->{value} );
+    MR->debug( "Got input '%s'", $value->{key} );
     
     die 'Mapper is undefined? for ' . $$
         if !defined $mapper;
     
-    my $mapped = $mapper->($value);
+    my $mapped = $mapper->($self, $value);
     
     if (defined $mapped && defined $mapped->{key}) {
         $redis->lpush( $name.'-mapped', nfreeze($mapped) );
     }
     
-    MR->debug( "Mapped is '%s' => '%s'", $mapped->{key}, $mapped->{value} );
+    MR->debug( "Mapped is '%s'", $mapped->{key} );
 
     
     $redis->set( $name.'-mapping', 0 );
