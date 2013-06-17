@@ -2,29 +2,10 @@ package MR::Reducer;
 use Moo;
 use Storable qw(nfreeze thaw);
 
-has pid => (
-    is => 'rw',
-);
-
 with 'MR::Redis';
-
-my @pids;
+with 'MR::Daemon';
 
 sub run {
-    my ($self) = @_;
-
-    my $pid = fork;
-    
-    if ($pid == 0) {
-        $self->_run();
-        exit 0;
-    }
-    
-    $self->pid($pid);
-    push @pids, $pid;
-}
-
-sub _run {
     my ($self) = @_;
     
     MR->info( "Reducer $$ started." );
@@ -91,34 +72,6 @@ sub _run_reducer {
     }
 
     $redis->set( $name.'-reducing', 0 );
-}
-
-sub DESTROY {
-    my ($self) = @_;
-    
-    REAPER($self->pid);
-}
-
-END {
-    REAPER($_) for @pids;
-}
-
-sub REAPER {
-    my ($pid) = @_;
-    
-    my $status = $?;
-    
-    return if !kill( 0 => $pid );
-
-    kill 'TERM' => $pid;
-    
-    MR->info( "Waiting on reducer $pid to stop." );
-        
-    waitpid $pid, 0;
-    
-    MR->info( "Reducer $$ stopped." );
-    
-    $? = $status;
 }
 
 1;

@@ -16,7 +16,7 @@ my $mr = MR->new(
     name => 'test1',
     
     mapper => sub {
-        my ($input) = @_;
+        my ($self, $input) = @_;
         
         $input->{value} *= 2;
         
@@ -24,7 +24,7 @@ my $mr = MR->new(
     },
     
     reducer => sub {
-        my ($nums) = @_;
+        my ($self, $nums) = @_;
         
         my %seen;
         
@@ -37,31 +37,18 @@ my $inputs = [ map {{ key => $_, value => $_ }} 5, 2, 3, 4, 1 ];
 
 $mr->input($_) for @$inputs;
 
-# Puts the mapper and reducer subs in redis
-$mr->run();
-
 # Start up 5 mapper processes
 my %mappers;
 
 for (1..5) {
-    $mappers{$_} = MR::Mapper->new();
-    $mappers{$_}->run();
+    $mappers{$_} = MR::Mapper->new(daemon => 1);
 }
 
 # Start up 1 reducer process
-my $reducer = MR::Reducer->new();
-$reducer->run();
+my $reducer = MR::Reducer->new(daemon => 1);
 
-# Fetch result values as they become available
-my @values;
-
-while (!$mr->done) {
-    my $value = $mr->next_result();
-    
-    next if !defined $value;
-    
-    push @values, $value->{value};
-}
+my $results = $mr->all_results;
+my @values  = map { $_->{value} } @$results;
 
 cmp_deeply \@values, bag(2, 4, 6, 8, 10), 'Got all results from map-reduce operation';
 
