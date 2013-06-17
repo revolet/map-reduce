@@ -66,10 +66,9 @@ sub _run_mapper {
     
     if (defined $mapped && defined $mapped->{key}) {
         $redis->lpush( $name.'-mapped', nfreeze($mapped) );
+        
+        MR->debug( "Mapped is '%s'", $mapped->{key} );
     }
-    
-    MR->debug( "Mapped is '%s'", $mapped->{key} );
-
     
     $redis->set( $name.'-mapping', 0 );
 }
