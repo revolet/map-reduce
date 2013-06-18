@@ -65,11 +65,11 @@ sub done {
     my $redis = $self->redis;
     my $name  = $self->name;
     
-    my $done = !$redis->llen( $name.'-input'    )
-            && !$redis->llen( $name.'-mapped'   )
-            && !$redis->llen( $name.'-reduced'  )
-            && !$redis->get(  $name.'-mapping'  )
+    my $done = !$redis->llen( $name.'-reduced'  )
             && !$redis->get(  $name.'-reducing' )
+            && !$redis->llen( $name.'-mapped'   )
+            && !$redis->get(  $name.'-mapping'  )
+            && !$redis->llen( $name.'-input'    )
     ;
     
     # TODO: This needs to be done in the Mapper and Reducer classes
@@ -88,6 +88,8 @@ sub next_result {
     my $name  = $self->name;
     
     while (1) {
+        return undef if $self->done;
+        
         MR->debug( "Input queue:   %s", $redis->llen( $name.'-input'    ) );
         MR->debug( "Mapped queue:  %s", $redis->llen( $name.'-mapped'   ) );
         MR->debug( "Reduced queue: %s", $redis->llen( $name.'-reduced'  ) );
@@ -96,11 +98,8 @@ sub next_result {
 
         my $reduced = $redis->brpop( $self->name.'-reduced', 1);
         
-        if (!defined $reduced || !defined $reduced->[1]) {
-            return undef if $self->done;
-            
-            next;
-        }
+        next if !defined $reduced;
+        next if !defined $reduced->[1];
         
         my $value = thaw($reduced->[1]);
         
