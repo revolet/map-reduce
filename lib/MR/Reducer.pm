@@ -3,6 +3,7 @@ use Moo;
 use Storable qw(nfreeze thaw);
 
 with 'MR::Redis';
+with 'MR::Cache';
 with 'MR::Daemon';
 
 sub run {
@@ -43,7 +44,10 @@ sub _run_reducer {
 
     my $redis = $self->redis;
     
-    return if $redis->llen( $name.'-mapped' ) == 0;
+    if ($redis->llen( $name.'-mapped' ) == 0) {
+        sleep 0.1;
+        return;
+    }
     
     $redis->set( $name.'-reducing', 1 );
     
