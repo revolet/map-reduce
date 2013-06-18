@@ -79,8 +79,6 @@ sub next_result {
     my $name  = $self->name;
     
     while (1) {
-        return undef if $self->done;
-
         MR->debug( "Input queue:   %s", $redis->llen( $name.'-input'    ) );
         MR->debug( "Mapped queue:  %s", $redis->llen( $name.'-mapped'   ) );
         MR->debug( "Reduced queue: %s", $redis->llen( $name.'-reduced'  ) );
@@ -89,8 +87,11 @@ sub next_result {
 
         my $reduced = $redis->brpop( $self->name.'-reduced', 1);
         
-        next if !defined $reduced;
-        next if !defined $reduced->[1];
+        if (!defined $reduced || !defined $reduced->[1]) {
+            return undef if $self->done;
+            
+            next;
+        }
         
         my $value = thaw($reduced->[1]);
         
