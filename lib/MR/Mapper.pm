@@ -35,6 +35,8 @@ sub run {
                 }
             }
             
+            MR->debug("Running mapper for %s", $name);
+            
             $self->_run_mapper($name, $mapper{$name});
         }
     }

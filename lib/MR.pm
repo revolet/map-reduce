@@ -65,13 +65,22 @@ sub done {
     my $redis = $self->redis;
     my $name  = $self->name;
     
-    return !$redis->llen( $name.'-input'    )
-        && !$redis->llen( $name.'-mapped'   )
-        && !$redis->llen( $name.'-reduced'  )
-        && !$redis->get(  $name.'-mapping'  )
-        && !$redis->get(  $name.'-reducing' )
+    my $done = !$redis->llen( $name.'-input'    )
+            && !$redis->llen( $name.'-mapped'   )
+            && !$redis->llen( $name.'-reduced'  )
+            && !$redis->get(  $name.'-mapping'  )
+            && !$redis->get(  $name.'-reducing' )
     ;
+    
+    # TODO: This needs to be done in the Mapper and Reducer classes
+    if ($done) {
+        $redis->hdel( mapper  => $self->name );
+        $redis->hdel( reducer => $self->name );
+    }
+    
+    return $done;
 }
+
 sub next_result {
     my ($self) = @_;
     

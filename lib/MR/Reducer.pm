@@ -34,6 +34,8 @@ sub run {
                 }
             }
             
+            MR->debug("Running reducer for %s", $name);
+            
             $self->_run_reducer($name, $reducer{$name});
         }
     }
