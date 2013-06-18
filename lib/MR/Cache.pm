@@ -11,13 +11,15 @@ sub cache {
     my $field     = $args{field}   // die 'field required';
     my $timeout   = $args{timeout} // 600;
     my $generator = $args{generator};
+    my $value     = $args{value};
     
     $key = 'mr-cache-'.$key;
     
-    my $value;
-    
     if ( $generator && !$self->redis->hexists($key => $field) ) {
         $value = $generator->();
+        $self->redis->hset( $key => ( $field => nfreeze($value) ) );
+    }
+    elsif ($value && !$self->redis->hexists($key => $field) ) {
         $self->redis->hset( $key => ( $field => nfreeze($value) ) );
     }
     else {
