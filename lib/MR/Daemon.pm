@@ -19,8 +19,11 @@ sub BUILD {
 
     my $pid = fork;
     
+    die 'Unable to fork child process'
+        if !defined $pid;
+    
     if ($pid == 0) {
-        $self->run();
+        $self->run_loop();
         exit 0;
     }
     

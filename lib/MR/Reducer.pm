@@ -6,38 +6,44 @@ with 'MR::Redis';
 with 'MR::Cache';
 with 'MR::Daemon';
 
-sub run {
+sub run_loop {
     my ($self) = @_;
     
     MR->info( "Reducer $$ started." );
     
+    while (1) {
+        $self->run();
+    }
+}
+
+my %reducer;
+
+sub run {
+    my ($self) = @_;
+    
     my $redis = $self->redis;
     
-    my %reducer;
-    
-    while (1) {
-        my $names = $redis->hkeys('reducer');
+    my $names = $redis->hkeys('reducer');
+            
+    for my $name (@$names) {
+        if ( !$reducer{$name} ) {
+            my $code = $redis->hget( reducer => $name );
+            
+            MR->debug( "Got reducer for %s: %s", $name, $code );
+            
+            local $@;
+            
+            {                
+                $reducer{$name} = eval 'my $sub = sub ' . $code;
                 
-        for my $name (@$names) {
-            if ( !$reducer{$name} ) {
-                my $code = $redis->hget( reducer => $name );
-                
-                MR->debug( "Got reducer for %s: %s", $name, $code );
-                
-                local $@;
-                
-                {                
-                    $reducer{$name} = eval 'my $sub = sub ' . $code;
-                    
-                    die "Failed to compile reducer for $name: $@"
-                        if $@;
-                }
+                die "Failed to compile reducer for $name: $@"
+                    if $@;
             }
-            
-            MR->debug("Running reducer for %s", $name);
-            
-            $self->_run_reducer($name, $reducer{$name});
         }
+        
+        MR->debug("Running reducer for %s", $name);
+        
+        $self->_run_reducer($name, $reducer{$name});
     }
 }
 
