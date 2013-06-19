@@ -6,6 +6,11 @@ with 'MR::Redis';
 with 'MR::Cache';
 with 'MR::Daemon';
 
+has reducers => (
+    is      => 'ro',
+    default => sub { {} },
+);
+
 sub run_loop {
     my ($self) = @_;
     
@@ -16,8 +21,6 @@ sub run_loop {
     }
 }
 
-my %reducer;
-
 sub run {
     my ($self) = @_;
     
@@ -26,24 +29,24 @@ sub run {
     my $names = $redis->hkeys('reducer');
             
     for my $name (@$names) {
-        if ( !$reducer{$name} ) {
+        if ( !$self->reducers->{$name} ) {
             my $code = $redis->hget( reducer => $name );
+            
+            next if !$code;
             
             MR->debug( "Got reducer for %s: %s", $name, $code );
             
             local $@;
             
             {                
-                $reducer{$name} = eval 'my $sub = sub ' . $code;
+                $self->reducers->{$name} = eval 'my $sub = sub ' . $code;
                 
                 die "Failed to compile reducer for $name: $@"
                     if $@;
             }
         }
         
-        MR->debug("Running reducer for %s", $name);
-        
-        $self->_run_reducer($name, $reducer{$name});
+        $self->_run_reducer($name, $self->reducers->{$name});
     }
 }
 
@@ -53,7 +56,6 @@ sub _run_reducer {
     my $redis = $self->redis;
     
     if ($redis->llen( $name.'-mapped' ) == 0) {
-        sleep 0.1;
         return;
     }
     

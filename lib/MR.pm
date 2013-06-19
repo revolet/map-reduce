@@ -48,7 +48,10 @@ sub BUILD {
 }
 
 sub input {
-    my ($self, $input) = @_;
+    my $self = shift;
+    
+    # Support a hash or hash ref for the input
+    my $input = @_ == 1 ? shift : {@_};
     
     my $redis = $self->redis;
     

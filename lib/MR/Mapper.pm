@@ -1,7 +1,11 @@
 package MR::Mapper;
 use Moo;
 use Storable qw(nfreeze thaw);
-use Time::HiRes qw(sleep);
+
+has mappers => (
+    is      => 'ro',
+    default => sub { {} },
+);
 
 with 'MR::Redis';
 with 'MR::Cache';
@@ -17,34 +21,32 @@ sub run_loop {
     }
 }
 
-my %mapper;
-
 sub run {
     my ($self) = @_;
     
     my $redis = $self->redis;
     
     my $names = $redis->hkeys('mapper');
-            
+    
     for my $name (@$names) {
-        if ( !$mapper{$name} ) {
+        if ( !exists $self->mappers->{$name} ) {
             my $code = $redis->hget( mapper => $name );
             
-            MR->debug( "Got mapper for %s: %s", $name, $code );
+            next if !$code;
+            
+            MR->debug( "Got mapper for %s in process %s: %s", $name, $$, $code );
             
             local $@;
             
             {                
-                $mapper{$name} = eval 'sub ' . $code;
+                $self->mappers->{$name} = eval 'sub ' . $code;
                 
                 die "Failed to compile mapper for $name: $@"
                     if $@;
             }
         }
         
-        MR->debug("Running mapper for %s", $name);
-        
-        $self->_run_mapper($name, $mapper{$name});
+        $self->_run_mapper($name, $self->mappers->{$name});
     }
 }
 
@@ -54,7 +56,6 @@ sub _run_mapper {
     my $redis = $self->redis;
     
     if ($redis->llen( $name.'-input' ) == 0) {
-        sleep 0.1;
         return;
     }
     
