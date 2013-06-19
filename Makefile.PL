@@ -3,7 +3,7 @@ use inc::Module::Install;
 name     'MR';
 abstract 'MR is a simple Map-Reduce platform that uses Perl 5 and Redis.';
 author   'James Barton <james@revolet.com>';
-version  '0.1';
+version  '0.12';
 license  'MIT';
 
 requires 'Moo'            => 0;
