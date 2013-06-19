@@ -32,7 +32,7 @@ sub BUILD {
     push @pids, $pid;
 }
 
-sub DESTROY {
+sub DEMOLISH {
     my ($self) = @_;
     
     REAPER($self->pid);
