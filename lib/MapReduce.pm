@@ -1,9 +1,9 @@
-package MR;
+package MapReduce;
 use Moo;
 use Storable qw(nfreeze thaw);
 use B::Deparse;
-use MR::Mapper;
-use MR::Reducer;
+use MapReduce::Mapper;
+use MapReduce::Reducer;
 
 # Do not change these. Rather, to enable logging,
 # change the $LOGGING value to one of these variables.
@@ -12,7 +12,7 @@ our $INFO  = 1;
 our $NONE  = 0;
 
 # Enable / disable logging.
-our $LOGGING = $ENV{MR_LOGGING} // $NONE;
+our $LOGGING = $ENV{MAPREDUCELOGGING} // $NONE;
 
 sub debug { shift->log('DEBUG', @_) if $LOGGING >= $DEBUG }
 sub info  { shift->log('INFO',  @_) if $LOGGING >= $INFO  }
@@ -30,7 +30,7 @@ has [ qw( name mapper reducer ) ] => (
     required => 1,
 );
 
-with 'MR::Redis';
+with 'MapReduce::Redis';
 
 sub BUILD {
     my ($self) = @_;
@@ -40,8 +40,8 @@ sub BUILD {
     my $reducer = $deparse->coderef2text( $self->reducer );
     my $redis   = $self->redis;
     
-    MR->debug( "Mapper is '%s'",  $mapper );
-    MR->debug( "Reducer is '%s'", $reducer );
+    MapReduce->debug( "Mapper is '%s'",  $mapper );
+    MapReduce->debug( "Reducer is '%s'", $reducer );
     
     $redis->hset( mapper  => ( $self->name => $mapper  ) );
     $redis->hset( reducer => ( $self->name => $reducer ) );
@@ -57,7 +57,7 @@ sub input {
     
     $redis->lpush( $self->name.'-input', nfreeze($input) );
     
-    MR->debug( "Pushed input '%s' to %s->input.", $input->{key}, $self->name );
+    MapReduce->debug( "Pushed input '%s' to %s->input.", $input->{key}, $self->name );
     
     return $self;
 }
@@ -93,11 +93,11 @@ sub next_result {
     while (1) {
         return undef if $self->done;
         
-        MR->debug( "Input queue:   %s", $redis->llen( $name.'-input'    ) );
-        MR->debug( "Mapped queue:  %s", $redis->llen( $name.'-mapped'   ) );
-        MR->debug( "Reduced queue: %s", $redis->llen( $name.'-reduced'  ) );
-        MR->debug( "Mapping?:      %s", $redis->get(  $name.'-mapping'  ) );
-        MR->debug( "Reducing?:     %s", $redis->get(  $name.'-reducing' ) );
+        MapReduce->debug( "Input queue:   %s", $redis->llen( $name.'-input'    ) );
+        MapReduce->debug( "Mapped queue:  %s", $redis->llen( $name.'-mapped'   ) );
+        MapReduce->debug( "Reduced queue: %s", $redis->llen( $name.'-reduced'  ) );
+        MapReduce->debug( "Mapping?:      %s", $redis->get(  $name.'-mapping'  ) );
+        MapReduce->debug( "Reducing?:     %s", $redis->get(  $name.'-reducing' ) );
 
         my $reduced = $redis->brpop( $self->name.'-reduced', 1);
         

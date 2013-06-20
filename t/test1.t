@@ -4,7 +4,7 @@ use warnings;
 use Test::More;
 use Test::Deep;
 use Redis::hiredis;
-use MR;
+use MapReduce;
 
 my $redis = Redis::hiredis->new();
 
@@ -12,7 +12,7 @@ $redis->connect('127.0.0.1', 6379);
 $redis->select(9);
 $redis->flushdb();
 
-my $mr = MR->new(
+my $mr = MapReduce->new(
     name => 'test1',
     
     mapper => sub {
@@ -41,11 +41,11 @@ $mr->input($_) for @$inputs;
 my %mappers;
 
 for (1..5) {
-    $mappers{$_} = MR::Mapper->new(daemon => 1);
+    $mappers{$_} = MapReduce::Mapper->new(daemon => 1);
 }
 
 # Start up 1 reducer process
-my $reducer = MR::Reducer->new(daemon => 1);
+my $reducer = MapReduce::Reducer->new(daemon => 1);
 
 my $results = $mr->all_results;
 my @values  = map { $_->{value} } @$results;
