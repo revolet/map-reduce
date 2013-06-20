@@ -1,4 +1,4 @@
-package MR::Redis;
+package MapReduce::Redis;
 use Moo::Role;
 use Redis::hiredis;
 
@@ -19,10 +19,10 @@ sub redis {
     
     $redis = Redis::hiredis->new(utf8 => 0);
     
-    my $host    = $ENV{MR_REDIS_HOST}    // '127.0.0.1';
-    my $port    = $ENV{MR_REDIS_PORT}    // 6379;
-    my $db      = $ENV{MR_REDIS_DB}      // 9;
-    my $flushdb = $ENV{MR_REDIS_FLUSHDB} // 0;
+    my $host    = $ENV{MAPREDUCEREDIS_HOST}    // '127.0.0.1';
+    my $port    = $ENV{MAPREDUCEREDIS_PORT}    // 6379;
+    my $db      = $ENV{MAPREDUCEREDIS_DB}      // 9;
+    my $flushdb = $ENV{MAPREDUCEREDIS_FLUSHDB} // 0;
     
     $redis->connect($host, $port);
     $redis->select($db);

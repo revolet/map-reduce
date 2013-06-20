@@ -1,4 +1,4 @@
-package MR::Daemon;
+package MapReduce::Daemon;
 use Moo::Role;
 
 has daemon => (
@@ -52,11 +52,11 @@ sub REAPER {
 
     kill 'TERM' => $pid;
     
-    MR->info( "Waiting on mapper $pid to stop." );
+    MapReduce->info( "Waiting on mapper $pid to stop." );
         
     waitpid $pid, 0;    
     
-    MR->info( "Mapper $$ stopped." );
+    MapReduce->info( "Mapper $$ stopped." );
     
     $? = $status;
 }
