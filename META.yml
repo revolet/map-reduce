@@ -3,13 +3,14 @@ abstract: 'MapReduce is a simple Map-Reduce platform that uses Perl 5 and Redis.
 author:
   - 'James Barton <james@revolet.com>'
 build_requires:
-  ExtUtils::MakeMaker: 6.42
+  ExtUtils::MakeMaker: 6.36
   Test::Deep: 0
   Test::More: 0
 configure_requires:
-  ExtUtils::MakeMaker: 6.42
+  ExtUtils::MakeMaker: 6.36
 distribution_type: module
-generated_by: 'Module::Install version 1.00'
+dynamic_config: 1
+generated_by: 'Module::Install version 1.06'
 license: mit
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -24,4 +25,4 @@ requires:
   Redis::hiredis: 0
 resources:
   license: http://opensource.org/licenses/mit-license.php
-version: 0.11
+version: 0.12

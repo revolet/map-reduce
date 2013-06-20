@@ -29,7 +29,7 @@ sub run {
     my $names = $redis->hkeys('reducer');
             
     for my $name (@$names) {
-        if ( !$self->reducers->{$name} ) {
+        if ( !exists $self->reducers->{$name} ) {
             my $code = $redis->hget( reducer => $name );
             
             next if !$code;
