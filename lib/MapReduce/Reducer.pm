@@ -1,10 +1,10 @@
-package MR::Reducer;
+package MapReduce::Reducer;
 use Moo;
 use Storable qw(nfreeze thaw);
 
-with 'MR::Redis';
-with 'MR::Cache';
-with 'MR::Daemon';
+with 'MapReduce::Redis';
+with 'MapReduce::Cache';
+with 'MapReduce::Daemon';
 
 has reducers => (
     is      => 'ro',
@@ -14,7 +14,7 @@ has reducers => (
 sub run_loop {
     my ($self) = @_;
     
-    MR->info( "Reducer $$ started." );
+    MapReduce->info( "Reducer $$ started." );
     
     while (1) {
         $self->run();
@@ -34,7 +34,7 @@ sub run {
             
             next if !$code;
             
-            MR->debug( "Got reducer for %s: %s", $name, $code );
+            MapReduce->debug( "Got reducer for %s: %s", $name, $code );
             
             local $@;
             
@@ -70,7 +70,7 @@ sub _run_reducer {
         
         my $value = thaw($mapped);
     
-        MR->debug( "Got mapped '%s'", $value->{key} );
+        MapReduce->debug( "Got mapped '%s'", $value->{key} );
         
         push @values, $value;
     }
@@ -78,7 +78,7 @@ sub _run_reducer {
     if (@values > 0) {
         my $reduced = $reducer->($self, \@values);
         
-        MR->debug( "Reduced is '%s'", $_->{key} )
+        MapReduce->debug( "Reduced is '%s'", $_->{key} )
             for @$reduced;
 
         $redis->lpush( $name.'-reduced', nfreeze($_) )

@@ -12,7 +12,7 @@ then drop any that have less than 3 characters.
 use strict;
 use warnings;
 use Redis::hiredis;
-use MR;
+use MapReduce;
 
 # This is necessary at the moment until we can improve redis integration
 my $redis = Redis::hiredis->new();
@@ -27,17 +27,17 @@ my @workers;
 
 # Fork one mapper (you can use several)
 for (1..1) {
-    push @workers, MR::Mapper->new(
+    push @workers, MapReduce::Mapper->new(
         daemon => 1,
     );
 }
 
 # Fork one reducer (currently only one is useful)
-push @workers, MR::Reducer->new(
+push @workers, MapReduce::Reducer->new(
     daemon => 1,
 );
 
-my $mr = MR->new(
+my $mr = MapReduce->new(
     name    => 'count-chars',
     mapper  => \&mapper,
     reducer => \&reducer,

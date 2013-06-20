@@ -1,5 +1,5 @@
 ---
-abstract: 'MR is a simple Map-Reduce platform that uses Perl 5 and Redis.'
+abstract: 'MapReduce is a simple Map-Reduce platform that uses Perl 5 and Redis.'
 author:
   - 'James Barton <james@revolet.com>'
 build_requires:
@@ -14,7 +14,7 @@ license: mit
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
   version: 1.4
-name: MR
+name: MapReduce
 no_index:
   directory:
     - inc

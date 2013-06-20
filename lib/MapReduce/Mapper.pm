@@ -1,4 +1,4 @@
-package MR::Mapper;
+package MapReduce::Mapper;
 use Moo;
 use Storable qw(nfreeze thaw);
 
@@ -7,14 +7,14 @@ has mappers => (
     default => sub { {} },
 );
 
-with 'MR::Redis';
-with 'MR::Cache';
-with 'MR::Daemon';
+with 'MapReduce::Redis';
+with 'MapReduce::Cache';
+with 'MapReduce::Daemon';
 
 sub run_loop {
     my ($self) = @_;
     
-    MR->info( "Mapper $$ started." );
+    MapReduce->info( "Mapper $$ started." );
 
     while (1) {
         $self->run();
@@ -34,7 +34,7 @@ sub run {
             
             next if !$code;
             
-            MR->debug( "Got mapper for %s in process %s: %s", $name, $$, $code );
+            MapReduce->debug( "Got mapper for %s in process %s: %s", $name, $$, $code );
             
             local $@;
             
@@ -70,7 +70,7 @@ sub _run_mapper {
     
     my $value = thaw($input);
     
-    MR->debug( "Got input '%s'", $value->{key} );
+    MapReduce->debug( "Got input '%s'", $value->{key} );
     
     die 'Mapper is undefined? for ' . $$
         if !defined $mapper;
@@ -80,7 +80,7 @@ sub _run_mapper {
     if (defined $mapped && defined $mapped->{key}) {
         $redis->lpush( $name.'-mapped', nfreeze($mapped) );
         
-        MR->debug( "Mapped is '%s'", $mapped->{key} );
+        MapReduce->debug( "Mapped is '%s'", $mapped->{key} );
     }
     
     $redis->set( $name.'-mapping', 0 );

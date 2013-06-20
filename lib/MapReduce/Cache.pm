@@ -1,4 +1,4 @@
-package MR::Cache;
+package MapReduce::Cache;
 use Moo::Role;
 use Storable qw(nfreeze thaw);
 
