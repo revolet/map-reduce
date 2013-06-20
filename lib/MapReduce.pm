@@ -12,7 +12,7 @@ our $INFO  = 1;
 our $NONE  = 0;
 
 # Enable / disable logging.
-our $LOGGING = $ENV{MAPREDUCELOGGING} // $NONE;
+our $LOGGING = $ENV{MAPREDUCE_LOGGING} // $NONE;
 
 sub debug { shift->log('DEBUG', @_) if $LOGGING >= $DEBUG }
 sub info  { shift->log('INFO',  @_) if $LOGGING >= $INFO  }
@@ -30,7 +30,7 @@ has [ qw( name mapper reducer ) ] => (
     required => 1,
 );
 
-with 'MapReduce::Redis';
+with 'MapReduce::Role::Redis';
 
 sub BUILD {
     my ($self) = @_;

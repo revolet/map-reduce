@@ -6,7 +6,7 @@ use Test::Deep;
 use Redis::hiredis;
 use MapReduce;
 
-my $redis = Redis::hiredis->new();
+my $redis = Redis::hiredis->new(utf8 => 0);
 
 $redis->connect('127.0.0.1', 6379);
 $redis->select(9);

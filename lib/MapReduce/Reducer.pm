@@ -2,14 +2,13 @@ package MapReduce::Reducer;
 use Moo;
 use Storable qw(nfreeze thaw);
 
-with 'MapReduce::Redis';
-with 'MapReduce::Cache';
-with 'MapReduce::Daemon';
-
 has reducers => (
     is      => 'ro',
     default => sub { {} },
 );
+
+with 'MapReduce::Role::Daemon';
+with 'MapReduce::Role::Redis';
 
 sub run_loop {
     my ($self) = @_;

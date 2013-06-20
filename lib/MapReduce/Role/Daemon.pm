@@ -1,4 +1,4 @@
-package MapReduce::Daemon;
+package MapReduce::Role::Daemon;
 use Moo::Role;
 
 has daemon => (

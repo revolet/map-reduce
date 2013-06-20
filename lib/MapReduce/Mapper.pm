@@ -7,9 +7,8 @@ has mappers => (
     default => sub { {} },
 );
 
-with 'MapReduce::Redis';
-with 'MapReduce::Cache';
-with 'MapReduce::Daemon';
+with 'MapReduce::Role::Daemon';
+with 'MapReduce::Role::Redis';
 
 sub run_loop {
     my ($self) = @_;
