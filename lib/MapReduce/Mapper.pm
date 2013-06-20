@@ -58,12 +58,12 @@ sub _run_mapper {
         return;
     }
     
-    $redis->set( $name.'-mapping', 1 );
+    $redis->incr( $name.'-mapping' );
     
     my $input = $redis->rpop( $name.'-input' );
     
     if (!defined $input) {
-        $redis->set( $name.'-mapping', 0);
+        $redis->decr( $name.'-mapping' );
         return;
     }
     
@@ -82,7 +82,7 @@ sub _run_mapper {
         MapReduce->debug( "Mapped is '%s'", $mapped->{key} );
     }
     
-    $redis->set( $name.'-mapping', 0 );
+    $redis->decr( $name.'-mapping' );
 }
 
 1;

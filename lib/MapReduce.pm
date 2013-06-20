@@ -50,6 +50,9 @@ sub BUILD {
 sub input {
     my $self = shift;
     
+    die 'Please surround your input operation with input_start() and input_done()'
+        if !$self->redis->get($self->name.'-inputting');
+    
     # Support a hash or hash ref for the input
     my $input = @_ == 1 ? shift : {@_};
     
@@ -62,18 +65,44 @@ sub input {
     return $self;
 }
 
+sub input_start {
+    my ($self) = @_;
+    
+    my $redis = $self->redis;
+    my $name  = $self->name;
+    
+    $redis->set( $name.'-inputting', 1 );
+}
+
+sub input_done {
+    my ($self) = @_;
+    
+    my $redis = $self->redis;
+    my $name  = $self->name;
+    
+    $redis->del( $name.'-inputting' );
+}
+
 sub done {
     my ($self) = @_;
     
     my $redis = $self->redis;
     my $name  = $self->name;
     
-    my $done = !$redis->llen( $name.'-reduced'  )
-            && !$redis->get(  $name.'-reducing' )
-            && !$redis->llen( $name.'-mapped'   )
-            && !$redis->get(  $name.'-mapping'  )
-            && !$redis->llen( $name.'-input'    )
+    my $done = !$redis->llen( $name.'-reduced'   )
+            && !$redis->get(  $name.'-reducing'  )
+            && !$redis->llen( $name.'-mapped'    )
+            && !$redis->get(  $name.'-mapping'   )
+            && !$redis->llen( $name.'-input'     )
+            && !$redis->get(  $name.'-inputting' )
     ;
+    
+    MapReduce->debug( "Input queue:   %s", $redis->llen( $name.'-input'     ) );
+    MapReduce->debug( "Mapped queue:  %s", $redis->llen( $name.'-mapped'    ) );
+    MapReduce->debug( "Reduced queue: %s", $redis->llen( $name.'-reduced'   ) );
+    MapReduce->debug( "Mapping?:      %s", $redis->get(  $name.'-mapping'   ) );
+    MapReduce->debug( "Reducing?:     %s", $redis->get(  $name.'-reducing'  ) );
+    MapReduce->debug( "Inputting?:    %s", $redis->get(  $name.'-inputting' ) );
     
     # TODO: This needs to be done in the Mapper and Reducer classes
     if ($done) {
@@ -92,12 +121,6 @@ sub next_result {
     
     while (1) {
         return undef if $self->done;
-        
-        MapReduce->debug( "Input queue:   %s", $redis->llen( $name.'-input'    ) );
-        MapReduce->debug( "Mapped queue:  %s", $redis->llen( $name.'-mapped'   ) );
-        MapReduce->debug( "Reduced queue: %s", $redis->llen( $name.'-reduced'  ) );
-        MapReduce->debug( "Mapping?:      %s", $redis->get(  $name.'-mapping'  ) );
-        MapReduce->debug( "Reducing?:     %s", $redis->get(  $name.'-reducing' ) );
 
         my $reduced = $redis->brpop( $self->name.'-reduced', 1);
         

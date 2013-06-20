@@ -58,7 +58,7 @@ sub _run_reducer {
         return;
     }
     
-    $redis->set( $name.'-reducing', 1 );
+    $redis->incr( $name.'-reducing' );
     
     my @values;
     
@@ -84,7 +84,7 @@ sub _run_reducer {
             for @$reduced;
     }
 
-    $redis->set( $name.'-reducing', 0 );
+    $redis->decr( $name.'-reducing' );
 }
 
 1;
