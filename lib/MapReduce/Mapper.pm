@@ -25,45 +25,45 @@ sub run {
     
     my $redis = $self->redis;
     
-    my $names = $redis->hkeys('mapper');
+    my $ids = $redis->hkeys('mapper');
     
-    for my $name (@$names) {
-        if ( !exists $self->mappers->{$name} ) {
-            my $code = $redis->hget( mapper => $name );
+    for my $id (@$ids) {
+        if ( !exists $self->mappers->{$id} ) {
+            my $code = $redis->hget( mapper => $id );
             
             next if !$code;
             
-            MapReduce->debug( "Got mapper for %s in process %s: %s", $name, $$, $code );
+            MapReduce->debug( "Got mapper for %s in process %s: %s", $id, $$, $code );
             
             local $@;
             
             {                
-                $self->mappers->{$name} = eval 'sub ' . $code;
+                $self->mappers->{$id} = eval 'sub ' . $code;
                 
-                die "Failed to compile mapper for $name: $@"
+                die "Failed to compile mapper for $id: $@"
                     if $@;
             }
         }
         
-        $self->_run_mapper($name, $self->mappers->{$name});
+        $self->_run_mapper($id, $self->mappers->{$id});
     }
 }
 
 sub _run_mapper {
-    my ($self, $name, $mapper) = @_;
+    my ($self, $id, $mapper) = @_;
     
     my $redis = $self->redis;
     
-    if ($redis->llen( $name.'-input' ) == 0) {
+    if ($redis->llen( $id.'-input' ) == 0) {
         return;
     }
     
-    $redis->incr( $name.'-mapping' );
+    $redis->incr( $id.'-mapping' );
     
-    my $input = $redis->rpop( $name.'-input' );
+    my $input = $redis->rpop( $id.'-input' );
     
     if (!defined $input) {
-        $redis->decr( $name.'-mapping' );
+        $redis->decr( $id.'-mapping' );
         return;
     }
     
@@ -77,12 +77,12 @@ sub _run_mapper {
     my $mapped = $mapper->($self, $value);
     
     if (defined $mapped && defined $mapped->{key}) {
-        $redis->lpush( $name.'-mapped', nfreeze($mapped) );
+        $redis->lpush( $id.'-mapped', nfreeze($mapped) );
         
         MapReduce->debug( "Mapped is '%s'", $mapped->{key} );
     }
     
-    $redis->decr( $name.'-mapping' );
+    $redis->decr( $id.'-mapping' );
 }
 
 1;

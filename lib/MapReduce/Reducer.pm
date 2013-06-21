@@ -25,45 +25,45 @@ sub run {
     
     my $redis = $self->redis;
     
-    my $names = $redis->hkeys('reducer');
+    my $ids = $redis->hkeys('reducer');
             
-    for my $name (@$names) {
-        if ( !exists $self->reducers->{$name} ) {
-            my $code = $redis->hget( reducer => $name );
+    for my $id (@$ids) {
+        if ( !exists $self->reducers->{$id} ) {
+            my $code = $redis->hget( reducer => $id );
             
             next if !$code;
             
-            MapReduce->debug( "Got reducer for %s: %s", $name, $code );
+            MapReduce->debug( "Got reducer for %s: %s", $id, $code );
             
             local $@;
             
             {                
-                $self->reducers->{$name} = eval 'my $sub = sub ' . $code;
+                $self->reducers->{$id} = eval 'my $sub = sub ' . $code;
                 
-                die "Failed to compile reducer for $name: $@"
+                die "Failed to compile reducer for $id: $@"
                     if $@;
             }
         }
         
-        $self->_run_reducer($name, $self->reducers->{$name});
+        $self->_run_reducer($id, $self->reducers->{$id});
     }
 }
 
 sub _run_reducer {
-    my ($self, $name, $reducer) = @_;
+    my ($self, $id, $reducer) = @_;
 
     my $redis = $self->redis;
     
-    if ($redis->llen( $name.'-mapped' ) == 0) {
+    if ($redis->llen( $id.'-mapped' ) == 0) {
         return;
     }
     
-    $redis->incr( $name.'-reducing' );
+    $redis->incr( $id.'-reducing' );
     
     my @values;
     
     while (1) {
-        my $mapped = $redis->rpop( $name.'-mapped' );
+        my $mapped = $redis->rpop( $id.'-mapped' );
 
         last if !defined $mapped;    
         
@@ -80,11 +80,11 @@ sub _run_reducer {
         MapReduce->debug( "Reduced is '%s'", $_->{key} )
             for @$reduced;
 
-        $redis->lpush( $name.'-reduced', nfreeze($_) )
+        $redis->lpush( $id.'-reduced', nfreeze($_) )
             for @$reduced;
     }
 
-    $redis->decr( $name.'-reducing' );
+    $redis->decr( $id.'-reducing' );
 }
 
 1;

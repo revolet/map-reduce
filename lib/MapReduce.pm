@@ -2,6 +2,8 @@ package MapReduce;
 use Moo;
 use Storable qw(nfreeze thaw);
 use B::Deparse;
+use Time::HiRes qw(time);
+use Carp qw(croak);
 use MapReduce::Mapper;
 use MapReduce::Reducer;
 
@@ -30,7 +32,17 @@ has [ qw( name mapper reducer ) ] => (
     required => 1,
 );
 
+has id => (
+    is => 'lazy',
+);
+
 with 'MapReduce::Role::Redis';
+
+sub _build_id {
+    my ($self) = @_;
+    
+    return $self->name . '-' . time . '-' . rand;
+}
 
 sub BUILD {
     my ($self) = @_;
@@ -43,24 +55,24 @@ sub BUILD {
     MapReduce->debug( "Mapper is '%s'",  $mapper );
     MapReduce->debug( "Reducer is '%s'", $reducer );
     
-    $redis->hset( mapper  => ( $self->name => $mapper  ) );
-    $redis->hset( reducer => ( $self->name => $reducer ) );
+    $redis->hset( mapper  => ( $self->id => $mapper  ) );
+    $redis->hset( reducer => ( $self->id => $reducer ) );
 }
 
 sub input {
     my $self = shift;
     
-    die 'Please surround your input operation with input_start() and input_done()'
-        if !$self->redis->get($self->name.'-inputting');
+    croak 'Please surround your input operation with input_start() and input_done()'
+        if !$self->redis->get($self->id.'-inputting');
     
     # Support a hash or hash ref for the input
     my $input = @_ == 1 ? shift : {@_};
     
     my $redis = $self->redis;
     
-    $redis->lpush( $self->name.'-input', nfreeze($input) );
+    $redis->lpush( $self->id.'-input', nfreeze($input) );
     
-    MapReduce->debug( "Pushed input '%s' to %s->input.", $input->{key}, $self->name );
+    MapReduce->debug( "Pushed input '%s' to %s->input.", $input->{key}, $self->id );
     
     return $self;
 }
@@ -68,46 +80,40 @@ sub input {
 sub input_start {
     my ($self) = @_;
     
-    my $redis = $self->redis;
-    my $name  = $self->name;
-    
-    $redis->set( $name.'-inputting', 1 );
+    $self->redis->set( $self->id.'-inputting', 1 );
 }
 
 sub input_done {
     my ($self) = @_;
     
-    my $redis = $self->redis;
-    my $name  = $self->name;
-    
-    $redis->del( $name.'-inputting' );
+    $self->redis->del( $self->id.'-inputting' );
 }
 
 sub done {
     my ($self) = @_;
     
     my $redis = $self->redis;
-    my $name  = $self->name;
+    my $id    = $self->id;
     
-    my $done = !$redis->llen( $name.'-reduced'   )
-            && !$redis->get(  $name.'-reducing'  )
-            && !$redis->llen( $name.'-mapped'    )
-            && !$redis->get(  $name.'-mapping'   )
-            && !$redis->llen( $name.'-input'     )
-            && !$redis->get(  $name.'-inputting' )
+    my $done = !$redis->llen( $id.'-reduced'   )
+            && !$redis->get(  $id.'-reducing'  )
+            && !$redis->llen( $id.'-mapped'    )
+            && !$redis->get(  $id.'-mapping'   )
+            && !$redis->llen( $id.'-input'     )
+            && !$redis->get(  $id.'-inputting' )
     ;
     
-    MapReduce->debug( "Input queue:   %s", $redis->llen( $name.'-input'     ) );
-    MapReduce->debug( "Mapped queue:  %s", $redis->llen( $name.'-mapped'    ) );
-    MapReduce->debug( "Reduced queue: %s", $redis->llen( $name.'-reduced'   ) );
-    MapReduce->debug( "Mapping?:      %s", $redis->get(  $name.'-mapping'   ) );
-    MapReduce->debug( "Reducing?:     %s", $redis->get(  $name.'-reducing'  ) );
-    MapReduce->debug( "Inputting?:    %s", $redis->get(  $name.'-inputting' ) );
+    MapReduce->debug( "Input queue:   %s", $redis->llen( $id.'-input'     ) );
+    MapReduce->debug( "Mapped queue:  %s", $redis->llen( $id.'-mapped'    ) );
+    MapReduce->debug( "Reduced queue: %s", $redis->llen( $id.'-reduced'   ) );
+    MapReduce->debug( "Mapping?:      %s", $redis->get(  $id.'-mapping'   ) );
+    MapReduce->debug( "Reducing?:     %s", $redis->get(  $id.'-reducing'  ) );
+    MapReduce->debug( "Inputting?:    %s", $redis->get(  $id.'-inputting' ) );
     
     # TODO: This needs to be done in the Mapper and Reducer classes
     if ($done) {
-        $redis->hdel( mapper  => $self->name );
-        $redis->hdel( reducer => $self->name );
+        $redis->hdel( mapper  => $self->id );
+        $redis->hdel( reducer => $self->id );
     }
     
     return $done;
@@ -117,19 +123,18 @@ sub next_result {
     my ($self) = @_;
     
     my $redis = $self->redis;
-    my $name  = $self->name;
     
     while (1) {
         return undef if $self->done;
 
-        my $reduced = $redis->brpop( $self->name.'-reduced', 1);
+        my $reduced = $redis->brpop( $self->id.'-reduced', 1);
         
         next if !defined $reduced;
         next if !defined $reduced->[1];
         
         my $value = thaw($reduced->[1]);
         
-        die 'Reduced result is undefined?'
+        croak 'Reduced result is undefined?'
             if !defined $value;
         
         return $value;
