@@ -4,6 +4,7 @@ use Storable qw(nfreeze thaw);
 use B::Deparse;
 use Time::HiRes qw(time);
 use Carp qw(croak);
+use List::MoreUtils qw(all);
 use MapReduce::Mapper;
 use MapReduce::Reducer;
 
@@ -95,20 +96,25 @@ sub done {
     my $redis = $self->redis;
     my $id    = $self->id;
     
-    my $done = !$redis->llen( $id.'-reduced'   )
-            && !$redis->get(  $id.'-reducing'  )
-            && !$redis->llen( $id.'-mapped'    )
-            && !$redis->get(  $id.'-mapping'   )
-            && !$redis->llen( $id.'-input'     )
-            && !$redis->get(  $id.'-inputting' )
-    ;
+    $redis->multi;
     
-    MapReduce->debug( "Input queue:   %s", $redis->llen( $id.'-input'     ) );
-    MapReduce->debug( "Mapped queue:  %s", $redis->llen( $id.'-mapped'    ) );
-    MapReduce->debug( "Reduced queue: %s", $redis->llen( $id.'-reduced'   ) );
-    MapReduce->debug( "Mapping?:      %s", $redis->get(  $id.'-mapping'   ) );
-    MapReduce->debug( "Reducing?:     %s", $redis->get(  $id.'-reducing'  ) );
-    MapReduce->debug( "Inputting?:    %s", $redis->get(  $id.'-inputting' ) );
+    $redis->llen( $id.'-input'     );
+    $redis->llen( $id.'-mapped'    );
+    $redis->llen( $id.'-reduced'   );
+    $redis->get(  $id.'-mapping'   );
+    $redis->get(  $id.'-reducing'  );
+    $redis->get(  $id.'-inputting' );
+    
+    my $values = $redis->exec;
+    
+    my $done = all { !$_ } @$values;
+    
+    MapReduce->debug( "Input queue:   %s", $values->[0] );
+    MapReduce->debug( "Mapped queue:  %s", $values->[1] );
+    MapReduce->debug( "Reduced queue: %s", $values->[2] );
+    MapReduce->debug( "Mapping?:      %s", $values->[3] );
+    MapReduce->debug( "Reducing?:     %s", $values->[4] );
+    MapReduce->debug( "Inputting?:    %s", $values->[5] );
     
     # TODO: This needs to be done in the Mapper and Reducer classes
     if ($done) {
