@@ -1,4 +1,4 @@
-## mr-map-reduce
+## map-reduce
 
 A simple MapReduce platform using Perl 5 and Redis
 
@@ -43,17 +43,14 @@ my $mr = MapReduce->new(
     reducer => \&reducer,
 );
 
-my $text = 'MapReduce is a programming model for processing large data sets with a parallel, distributed algorithm.';
+my $text = 'MapReduce is a programming model for processing large data sets in parallel.';
 
 my @words = split qr{\s+}, $text;
 
 for my $index (0 .. $#words) {
     $mr->input({
-        key => $index,
-        
-        value => {
-            word => $words[$index],
-        },
+        key  => $index,
+        word => $words[$index],
     });
 }
 
@@ -61,13 +58,13 @@ my $results = $mr->all_results;
 
 for my $result (@$results) {
     printf STDERR "Character count for word '%s': %s\n",
-        $result->{value}->{word}, $result->{value}->{count};
+        $result->{word}, $result->{count};
 }
 
 sub mapper {
     my ($mapper, $input) = @_;
     
-    $input->{value}->{count} = length $input->{value}->{word};
+    $input->{count} = length $input->{word};
     
     return $input;
 }
@@ -76,7 +73,7 @@ sub reducer {
     my ($reducer, $inputs) = @_;
     
     # Keep only inputs with a count > 3
-    return [ grep { $_->{value}->{count} > 3 } @$inputs ];
+    return [ grep { $_->{count} > 3 } @$inputs ];
 }
 ```
 
