@@ -12,6 +12,16 @@ $redis->connect('127.0.0.1', 6379);
 $redis->select(9);
 $redis->flushdb();
 
+# Start up 5 mapper processes
+my %mappers;
+
+for (1..5) {
+    $mappers{$_} = MapReduce::Mapper->new(daemon => 1);
+}
+
+# Start up 1 reducer process
+my $reducer = MapReduce::Reducer->new(daemon => 1);
+
 my $mr = MapReduce->new(
     name => 'test1',
     
@@ -38,16 +48,6 @@ my $inputs = [ map {{ key => $_, value => $_ }} 5, 2, 3, 4, 1 ];
 $mr->input_start;
 $mr->input($_) for @$inputs;
 $mr->input_done;
-
-# Start up 5 mapper processes
-my %mappers;
-
-for (1..5) {
-    $mappers{$_} = MapReduce::Mapper->new(daemon => 1);
-}
-
-# Start up 1 reducer process
-my $reducer = MapReduce::Reducer->new(daemon => 1);
 
 my $results = $mr->all_results;
 my @values  = map { $_->{value} } @$results;
