@@ -82,6 +82,8 @@ sub _run_reducer {
 
         $redis->lpush( $id.'-reduced', nfreeze($_) )
             for @$reduced;
+            
+        $redis->incrby( $id.'-reduced-count', scalar(@$reduced) );
     }
 
     $redis->decr( $id.'-reducing' );

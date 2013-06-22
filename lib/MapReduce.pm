@@ -42,7 +42,11 @@ with 'MapReduce::Role::Redis';
 sub _build_id {
     my ($self) = @_;
     
-    return $self->name . '-' . time . '-' . rand;
+    my $id = 'mr-'.$self->name . '-' . int(time) . '-' . $$ . '-' . int(rand(2**31));
+    
+    MapReduce->debug( "ID is '%s'", $id );
+    
+    return $id;
 }
 
 sub BUILD {
@@ -72,6 +76,8 @@ sub input {
     my $redis = $self->redis;
     
     $redis->lpush( $self->id.'-input', nfreeze($input) );
+    
+    $redis->incr( $self->id.'-input-count' );
     
     MapReduce->debug( "Pushed input '%s' to %s->input.", $input->{key}, $self->id );
     
@@ -131,17 +137,19 @@ sub next_result {
     my $redis = $self->redis;
     
     while (1) {
-        return undef if $self->done;
-
         my $reduced = $redis->brpop( $self->id.'-reduced', 1);
         
-        next if !defined $reduced;
-        next if !defined $reduced->[1];
-        
+        if (!defined $reduced || !defined $reduced->[1]) {
+            return undef if $self->done;
+            next;
+        }
+
         my $value = thaw($reduced->[1]);
         
         croak 'Reduced result is undefined?'
             if !defined $value;
+        
+        $redis->incr( $self->id.'-result-count' );
         
         return $value;
     }

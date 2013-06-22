@@ -79,6 +79,8 @@ sub _run_mapper {
     if (defined $mapped && defined $mapped->{key}) {
         $redis->lpush( $id.'-mapped', nfreeze($mapped) );
         
+        $redis->incr( $id.'-mapped-count' );
+        
         MapReduce->debug( "Mapped is '%s'", $mapped->{key} );
     }
     
