@@ -78,8 +78,26 @@ sub input {
     $redis->lpush( $self->id.'-input', nfreeze($input) );
     
     $redis->incr( $self->id.'-input-count' );
+    $redis->incr( $self->id.'-input-total' );
     
-    MapReduce->debug( "Pushed input '%s' to %s->input.", $input->{key}, $self->id );
+    MapReduce->debug( "Pushed input '%s' to %s-input.", $input->{key}, $self->id );
+    
+    return $self;
+}
+
+sub inputs {
+    my ($self, $inputs) = @_;
+    
+    my $redis = $self->redis;
+    
+    $redis->incrby( $self->id.'-input-total', scalar(@$inputs) );
+    
+    for my $input (@$inputs) {
+        $redis->lpush( $self->id.'-input', nfreeze($input) );
+        $redis->incr( $self->id.'-input-count' );
+    }
+    
+    MapReduce->debug( "Pushed %d inputs %s-input.", scalar(@$inputs), $self->id );
     
     return $self;
 }

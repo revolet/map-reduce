@@ -71,6 +71,8 @@ sub _run_reducer {
     
         MapReduce->debug( "Got mapped '%s'", $value->{key} );
         
+        $redis->incr( $id.'-reduced-count' );
+        
         push @values, $value;
     }
     
@@ -82,8 +84,6 @@ sub _run_reducer {
 
         $redis->lpush( $id.'-reduced', nfreeze($_) )
             for @$reduced;
-            
-        $redis->incrby( $id.'-reduced-count', scalar(@$reduced) );
     }
 
     $redis->decr( $id.'-reducing' );
