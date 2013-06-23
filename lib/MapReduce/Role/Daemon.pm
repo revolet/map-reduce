@@ -10,6 +10,8 @@ has pid => (
     is => 'rw',
 );
 
+my $parent = $$;
+
 my @pids;
 
 sub BUILD {
@@ -35,11 +37,14 @@ sub BUILD {
 sub DEMOLISH {
     my ($self) = @_;
     
-    REAPER($self->pid);
+    REAPER($self->pid)
+        if $$ == $parent;
 }
 
 END {
-    REAPER($_) for @pids;
+    if ($$ == $parent) {
+        REAPER($_) for @pids;
+    }
 }
 
 sub REAPER {
