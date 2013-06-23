@@ -167,14 +167,14 @@ sub next_result {
     my $redis = $self->redis;
     
     while (1) {
-        my $reduced = $redis->brpop( $self->id.'-reduced', 1);
+        my $reduced = $redis->rpop( $self->id.'-reduced');
         
-        if (!defined $reduced || !defined $reduced->[1]) {
+        if (!defined $reduced) {
             return undef if $self->done;
             next;
         }
 
-        my $value = thaw($reduced->[1]);
+        my $value = thaw($reduced);
         
         croak 'Reduced result is undefined?'
             if !defined $value;
