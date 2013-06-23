@@ -43,11 +43,11 @@ my $mr = MapReduce->new(
 );
 
 # Load up some numbers to feed into our map-reduce functions
-my $inputs = [ map {{ key => $_, value => $_ }} 5, 2, 3, 4, 1 ];
+my $inputs = [ map {{ key => $_, value => $_ }} 1..1_000 ];
 
-$mr->input_start;
-$mr->input($_) for @$inputs;
-$mr->input_done;
+$mr->input_async(sub {
+    $mr->input($_) for @$inputs;
+});
 
 my $results = $mr->all_results;
 my @values  = map { $_->{value} } @$results;

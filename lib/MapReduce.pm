@@ -84,6 +84,36 @@ sub input {
     return $self;
 }
 
+my @pids;
+
+sub input_async {
+    my ($self, $sub) = @_;
+    
+    my $pid = fork;
+    
+    die 'Unable to fork'
+        if !defined $pid;
+    
+    if ($pid == 0) {
+        eval {
+            $self->input_start();
+            $sub->();
+            $self->input_done();
+        };
+        
+        warn $@ if $@;
+        exit 0;
+    }
+    
+    push @pids, $pid;
+}
+
+END {
+    for my $pid (@pids) {
+        waitpid $pid, 0;
+    }
+}
+
 sub input_start {
     my ($self) = @_;
     
@@ -160,9 +190,14 @@ sub all_results {
     
     my @results;
     
-    while (!$self->done) {
+    while (1) {
         my $result = $self->next_result;
-        next if !defined $result;
+        
+        if (!defined $result) {
+            last if $self->done;
+            next;
+        }
+        
         push @results, $result;
     }
     
