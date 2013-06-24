@@ -10,7 +10,7 @@ has pid => (
     is => 'rw',
 );
 
-my $parent = $$;
+my $parent;
 
 my @pids;
 
@@ -18,6 +18,8 @@ sub BUILD {
     my ($self) = @_;
     
     return if !$self->daemon;
+    
+    $parent = $$;
 
     my $pid = fork;
     
