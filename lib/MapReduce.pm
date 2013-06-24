@@ -174,6 +174,12 @@ sub done {
     if ($done) {
         $redis->hdel( mapper  => $self->id );
         $redis->hdel( reducer => $self->id );
+        
+        my $keys = $redis->keys($id.'-*');
+        
+        for my $key (@$keys) {
+            $redis->expire($key, 600);
+        }
     }
     
     return $done;
