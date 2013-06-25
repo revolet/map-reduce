@@ -38,6 +38,14 @@ sub BUILD {
     push @pids, $pid;
 }
 
+sub is_running {
+    my ($self) = @_;
+    
+    return 0 if !$self->pid;
+    
+    return kill 0 => $self->pid;
+}
+
 sub DEMOLISH {
     my ($self) = @_;
     
