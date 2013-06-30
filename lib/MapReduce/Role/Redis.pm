@@ -19,10 +19,9 @@ sub redis {
     
     $redis = Redis::hiredis->new(utf8 => 0);
     
-    my $host    = $ENV{MAPREDUCE_REDIS_HOST}    // '127.0.0.1';
-    my $port    = $ENV{MAPREDUCE_REDIS_PORT}    // 6379;
-    my $db      = $ENV{MAPREDUCE_REDIS_DB}      // 9;
-    my $flushdb = $ENV{MAPREDUCE_REDIS_FLUSHDB} // 0;
+    my $host = $ENV{MAPREDUCE_REDIS_HOST} // '127.0.0.1';
+    my $port = $ENV{MAPREDUCE_REDIS_PORT} // 6379;
+    my $db   = $ENV{MAPREDUCE_REDIS_DB}   // 9;
     
     $redis->connect($host, $port);
     $redis->select($db);

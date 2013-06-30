@@ -90,6 +90,8 @@ sub inputs {
     
     my $redis = $self->redis;
     
+    $self->input_start;
+    
     $redis->incrby( $self->id.'-input-total', scalar(@$inputs) );
     
     for my $input (@$inputs) {
@@ -98,6 +100,8 @@ sub inputs {
     }
     
     MapReduce->debug( "Pushed %d inputs %s-input.", scalar(@$inputs), $self->id );
+    
+    $self->input_done;
     
     return $self;
 }
