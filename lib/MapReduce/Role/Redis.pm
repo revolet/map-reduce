@@ -1,6 +1,8 @@
 package MapReduce::Role::Redis;
 use Moo::Role;
 use Redis::hiredis;
+use Try::Tiny;
+use Time::HiRes;
 
 my $redis;
 
@@ -15,7 +17,25 @@ my $pid = '';
 sub redis {
     my ($self) = @_;
     
-    return $self->_redis if $pid eq $$;
+    return $self->_new_redis if $pid ne $$;
+    
+    my $redis = $self->_redis;
+    
+    try {
+        if ($redis->ping ne 'PONG') {
+            $redis = $self->_new_redis;
+        }
+    }
+    catch {
+        warn "Connection to redis closed.  Re-opening.  Error: $_";
+        $redis = $self->_new_redis;
+    };
+    
+    return $redis;
+}
+
+sub _new_redis {
+    my ($self) = @_;
     
     $redis = Redis::hiredis->new(utf8 => 0);
     
