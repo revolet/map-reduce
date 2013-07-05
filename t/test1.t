@@ -45,9 +45,7 @@ my $mr = MapReduce->new(
 # Load up some numbers to feed into our map-reduce functions
 my $inputs = [ map {{ key => $_, value => $_ }} 5, 2, 3, 4, 1 ];
 
-$mr->input_async(sub {
-    $mr->inputs($inputs);
-});
+$mr->inputs($inputs);
 
 my $results = $mr->all_results;
 my @values  = map { $_->{value} } @$results;

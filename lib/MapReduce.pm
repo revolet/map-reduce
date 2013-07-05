@@ -59,6 +59,12 @@ sub BUILD {
     
     MapReduce->debug( "Mapper is '%s'",  $mapper );
     MapReduce->debug( "Reducer is '%s'", $reducer );
+   
+    $SIG{INT} = sub { exit 1 }
+        if !$SIG{INT};
+        
+    $SIG{TERM} = sub { exit 1 }
+        if !$SIG{TERM};
     
     $redis->hset( mapper  => ( $self->id => $mapper  ) );
     $redis->hset( reducer => ( $self->id => $reducer ) );
@@ -106,36 +112,6 @@ sub inputs {
     return $self;
 }
 
-my @pids;
-
-sub input_async {
-    my ($self, $sub) = @_;
-    
-    my $pid = fork;
-    
-    die 'Unable to fork'
-        if !defined $pid;
-    
-    if ($pid == 0) {
-        eval {
-            $self->input_start();
-            $sub->();
-            $self->input_done();
-        };
-        
-        warn $@ if $@;
-        exit 0;
-    }
-    
-    push @pids, $pid;
-}
-
-END {
-    for my $pid (@pids) {
-        waitpid $pid, 0;
-    }
-}
-
 sub input_start {
     my ($self) = @_;
     
@@ -174,19 +150,25 @@ sub done {
     MapReduce->debug( "Reducing?:     %s", $values->[4] );
     MapReduce->debug( "Inputting?:    %s", $values->[5] );
     
-    # TODO: This needs to be done in the Mapper and Reducer classes
-    if ($done) {
-        $redis->hdel( mapper  => $self->id );
-        $redis->hdel( reducer => $self->id );
-        
-        my $keys = $redis->keys($id.'-*');
-        
-        for my $key (@$keys) {
-            $redis->expire($key, 600);
-        }
-    }
-    
     return $done;
+}
+
+sub DEMOLISH {
+    my ($self) = @_;
+    
+    MapReduce->debug( 'Cleaning up job keys' );
+    
+    my $redis = $self->redis;
+    my $id    = $self->id;
+
+    $redis->hdel( mapper  => $id );
+    $redis->hdel( reducer => $id );
+    
+    my $keys = $redis->keys($id.'-*');
+    
+    for my $key (@$keys) {
+        $redis->expire($key, 60);
+    }
 }
 
 sub next_result {
@@ -199,6 +181,7 @@ sub next_result {
         
         if (!defined $reduced) {
             return undef if $self->done;
+            sleep 1 if $LOGGING >= $DEBUG;
             next;
         }
 
