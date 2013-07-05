@@ -69,6 +69,9 @@ sub _run_mapper {
     
     my $value = thaw($input);
     
+    die 'Input has no key?'
+        if !exists $value->{key};
+    
     MapReduce->debug( "Got input '%s'", $value->{key} );
     
     die 'Mapper is undefined? for ' . $$
@@ -76,7 +79,10 @@ sub _run_mapper {
     
     my $mapped = $mapper->($self, $value);
     
-    if (defined $mapped && defined $mapped->{key}) {
+    if (defined $mapped) {
+        die 'Mapped value is defined but has no key?'
+            if !defined $mapped->{key};
+            
         $redis->lpush( $id.'-mapped', nfreeze($mapped) );
         
         $redis->incr( $id.'-mapped-count' );

@@ -1,6 +1,7 @@
 package MapReduce::Reducer;
 use Moo;
 use Storable qw(nfreeze thaw);
+use List::MoreUtils qw(any);
 
 has reducers => (
     is      => 'ro',
@@ -79,11 +80,14 @@ sub _run_reducer {
     if (@values > 0) {
         my $reduced = $reducer->($self, \@values);
         
+        die 'Reduced value is defined but has no key?'
+            if any { defined $_ && !defined $_->{key} } @$reduced;
+        
         MapReduce->debug( "Reduced is '%s'", $_->{key} )
-            for @$reduced;
+            for grep { defined $_ } @$reduced;
 
         $redis->lpush( $id.'-reduced', nfreeze($_) )
-            for @$reduced;
+            for grep { defined $_ } @$reduced;
     }
 
     $redis->decr( $id.'-reducing' );
