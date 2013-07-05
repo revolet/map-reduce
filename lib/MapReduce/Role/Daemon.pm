@@ -21,8 +21,6 @@ sub BUILD {
     
     $parent = $$;
     
-    $SIG{TERM} = sub { exit 0 };
-
     my $pid = fork;
     
     die 'Unable to fork child process'
