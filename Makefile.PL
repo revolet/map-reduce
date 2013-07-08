@@ -3,7 +3,7 @@ use inc::Module::Install;
 name     'MapReduce';
 abstract 'MapReduce is a simple Map-Reduce platform that uses Perl 5 and Redis.';
 author   'James Barton <james@revolet.com>';
-version  '0.13';
+version  '0.14';
 license  'MIT';
 
 requires 'Moo'            => 0;
