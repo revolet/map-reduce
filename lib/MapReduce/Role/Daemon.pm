@@ -6,74 +6,57 @@ has daemon => (
     default => sub { 0 },
 );
 
-has pid => (
+has parent_pid => (
     is => 'rw',
 );
 
-my $parent = -1;
-
-my @pids;
+has child_pid => (
+    is => 'rw',
+);
 
 sub BUILD {
     my ($self) = @_;
     
     return if !$self->daemon;
     
-    $parent = $$;
+    $self->parent_pid($$);
     
     my $pid = fork;
     
     die 'Unable to fork child process'
         if !defined $pid;
-    
-    if ($pid == 0) {
+
+    if ($pid == 0) {       
         $self->run_loop();
-        exit 0;
     }
     
-    $self->pid($pid);
-    
-    push @pids, $pid;
+    $self->child_pid($pid);
 }
 
 sub is_running {
     my ($self) = @_;
     
-    return 0 if !$self->pid;
+    return 0 if !$self->child_pid;
     
-    return kill 0 => $self->pid;
+    return kill 0 => $self->child_pid;
 }
 
 sub DEMOLISH {
     my ($self) = @_;
     
-    REAPER($self->pid)
-        if $$ == $parent;
-}
+    return if $$ ne $self->parent_pid;
+       
+    return if !$self->is_running;
 
-END {
-    if ($$ == $parent) {
-        REAPER($_) for @pids;
-    }
-}
-
-sub REAPER {
-    my ($pid) = @_;
+    kill 'KILL' => $self->child_pid;
     
-    # Save status to interfering with test suite
-    my $status = $?;
-    
-    return if !kill( 0 => $pid );
-
-    kill 'TERM' => $pid;
-    
-    MapReduce->info( "Waiting on mapper $pid to stop." );
+    MapReduce->info( "Waiting on worker %s to stop.", $self->child_pid );
         
-    waitpid $pid, 0;    
+    local $?;
+
+    waitpid $self->child_pid, 0;
     
-    MapReduce->info( "Mapper $$ stopped." );
-    
-    $? = $status;
+    MapReduce->info( "Worker %s stopped.", $self->child_pid );
 }
 
 1;
