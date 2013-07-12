@@ -1,5 +1,9 @@
 local
 Makefile
 Makefile.old
+META.yml
+MYMETA.yml
+MYMETA.json
+
 
 
