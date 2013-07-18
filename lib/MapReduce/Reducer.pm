@@ -39,7 +39,7 @@ sub run {
             local $@;
             
             {                
-                $self->reducers->{$id} = eval 'my $sub = sub ' . $code;
+                $self->reducers->{$id} = eval $code;
                 
                 die "Failed to compile reducer for $id: $@"
                     if $@;

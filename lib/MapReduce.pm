@@ -1,12 +1,15 @@
 package MapReduce;
 use Moo;
 use Storable qw(nfreeze thaw);
-use B::Deparse;
+use Data::Dump::Streamer qw(Dump);
 use Time::HiRes qw(time);
 use Carp qw(croak);
 use List::MoreUtils qw(all);
+use Exporter qw(import);
 use MapReduce::Mapper;
 use MapReduce::Reducer;
+
+our @EXPORT_OK = qw(pmap);
 
 # Do not change these. Rather, to enable logging,
 # change the $LOGGING value to one of these variables.
@@ -52,9 +55,8 @@ sub _build_id {
 sub BUILD {
     my ($self) = @_;
     
-    my $deparse = B::Deparse->new();
-    my $mapper  = $deparse->coderef2text( $self->mapper  );
-    my $reducer = $deparse->coderef2text( $self->reducer );
+    my $mapper  = ref $self->mapper  ? Dump( $self->mapper  )->Declare(1)->Out() : $self->mapper;
+    my $reducer = ref $self->reducer ? Dump( $self->reducer )->Declare(1)->Out() : $self->reducer;
     my $redis   = $self->redis;
     
     MapReduce->debug( "Mapper is '%s'",  $mapper );
@@ -213,6 +215,46 @@ sub all_results {
     }
     
     return \@results;
+}
+
+sub pmap (&@) {
+    my ($mapper, $inputs) = @_;
+    
+    my $mapper_count = $ENV{MAPREDUCE_PMAP_MAPPERS} // 4;
+    
+    my @mappers = map { MapReduce::Mapper->new(daemon => 1) } 1 .. $mapper_count;
+    my $reducer = MapReduce::Reducer->new(daemon => 1);
+    
+    my $map_reduce = MapReduce->new(
+        name => 'pmap-'.time.$$.int(rand(2**31)),
+        
+        mapper => sub {
+            my ($self, $input) = @_;
+            
+            local $_ = $input->{value};
+            
+            my $output = $mapper->(); 
+            
+            return {
+                key    => $input->{key},
+                output => $output,
+            };
+        },
+        
+        reducer => sub { $_[1] },
+    );
+    
+    my $key = 1;
+    
+    @$inputs = map { { key => $key++, value => $_ } } @$inputs;
+    
+    $map_reduce->inputs($inputs);
+    
+    my $results = $map_reduce->all_results;
+    
+    my @outputs = map { $_->{output} } sort { $a->{key} <=> $b->{key} } @$results;
+    
+    return \@outputs;
 }
 
 1;

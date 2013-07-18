@@ -38,7 +38,7 @@ sub run {
             local $@;
             
             {                
-                $self->mappers->{$id} = eval 'sub ' . $code;
+                $self->mappers->{$id} = eval $code;
                 
                 die "Failed to compile mapper for $id: $@"
                     if $@;
