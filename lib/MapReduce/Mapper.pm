@@ -16,7 +16,7 @@ sub run_loop {
     
     MapReduce->info( "Mapper $$ started." );
     
-    $0 = 'mapreduce.mapper';
+    $0 = 'mr.mapper';
 
     while (1) {
         $self->run();

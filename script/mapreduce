@@ -8,16 +8,18 @@ use Getopt::Long;
 use Time::HiRes qw(sleep);
 use MapReduce::Mapper;
 
-my $count = 1;
+my $mappers  = 1;
+my $reducers = 1;
 
 GetOptions(
-    'count|c=i' => \$count,
+    'mappers|m=i'  => \$mappers,
+    'reducers|r=i' => \$reducers,
 ) or die 'Error processing command line args';
 
 my $command = shift(@ARGV) // '';
 
 my $pidfile = File::Pid->new({
-    file => '/tmp/mapreduce-reducer.pid',
+    file => '/tmp/mapreduce.pid',
 });
 
 $pidfile->write();
@@ -42,7 +44,7 @@ if (lc($command) eq 'stop') {
     exit 0;
 }
 
-print STDERR "Starting $count reducers.\n";
+print STDERR "Starting $mappers mappers and $reducers reducers.\n";
 
 chdir '/';
 setsid;
@@ -62,7 +64,8 @@ my $run = 1;
 local $SIG{INT}  = sub { $run = 0 };
 local $SIG{TERM} = sub { $run = 0 };
 
-my @mappers = map { MapReduce::Reducer->new(daemon => 1) } 1 .. $count;
+my @mappers  = map { MapReduce::Mapper->new(daemon => 1)  } 1 .. $mappers;
+my @reducers = map { MapReduce::Reducer->new(daemon => 1) } 1 .. $reducers;
 
 $0 = 'mr.manager';
 

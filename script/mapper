@@ -64,7 +64,7 @@ local $SIG{TERM} = sub { $run = 0 };
 
 my @mappers = map { MapReduce::Mapper->new(daemon => 1) } 1 .. $count;
 
-$0 = 'mapreduce.mapper.manager';
+$0 = 'mr.manager';
 
 while ($run) {
     sleep 1;
