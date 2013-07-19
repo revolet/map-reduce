@@ -31,9 +31,14 @@ sub log {
     printf STDERR $level.': '.$format."\n", map { defined $_ ? $_ : 'undef' } @args;
 }
 
-has [ qw( name mapper reducer ) ] => (
+has [ qw( name mapper ) ] => (
     is       => 'ro',
     required => 1,
+);
+
+has reducer => (
+    is      => 'ro',
+    default => sub { sub { $_[1] } },
 );
 
 has id => (
@@ -215,6 +220,24 @@ sub all_results {
     }
     
     return \@results;
+}
+
+sub each_result {
+    my ($self, $callback) = @_;
+    
+    die 'callback required'
+        if !$callback;
+        
+    while (1) {
+        my $result = $self->next_result;
+        
+        if (!defined $result) {
+            last if $self->done;
+            next;
+        }
+        
+        $callback->($result);
+    }
 }
 
 sub pmap (&@) {
