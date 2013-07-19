@@ -2,6 +2,7 @@ package MapReduce::Reducer;
 use Moo;
 use Storable qw(nfreeze thaw);
 use List::MoreUtils qw(any);
+use MapReduce;
 
 has reducers => (
     is      => 'ro',
@@ -15,6 +16,8 @@ sub run_loop {
     my ($self) = @_;
     
     MapReduce->info( "Reducer $$ started." );
+    
+    $0 = 'mapreduce.reducer';
     
     while (1) {
         $self->run();

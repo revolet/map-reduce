@@ -1,0 +1,74 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use lib 'lib';
+use POSIX qw(setsid);
+use File::Pid;
+use Getopt::Long;
+use Time::HiRes qw(sleep);
+use MapReduce::Mapper;
+
+my $count = 1;
+
+GetOptions(
+    'count|c=i' => \$count,
+) or die 'Error processing command line args';
+
+my $command = shift(@ARGV) // '';
+
+my $pidfile = File::Pid->new({
+    file => '/tmp/mapreduce-mapper.pid',
+});
+
+$pidfile->write();
+
+if ($pidfile->running) {
+    my $pid = $pidfile->pid;
+    
+    print STDERR "$0 running in pid $pid.\n";
+    
+    kill 'TERM' => $pid;
+    
+    sleep 0.1;
+    
+    while (kill 0 => $pid) {
+        sleep 1;
+        print STDERR "Waiting for $0 in pid $pid to exit.\n";
+    }
+}
+
+if (lc($command) eq 'stop') {
+    print STDERR "Stopped.\n";
+    exit 0;
+}
+
+print STDERR "Starting $count mappers.\n";
+
+chdir '/';
+setsid;
+
+fork and exit;
+fork and exit;
+
+open *STDIN,  '< /dev/null';
+open *STDOUT, '> /dev/null';
+open *STDERR, '> /dev/null';
+
+$pidfile->pid($$);
+$pidfile->write();
+
+my $run = 1;
+
+local $SIG{INT}  = sub { $run = 0 };
+local $SIG{TERM} = sub { $run = 0 };
+
+my @mappers = map { MapReduce::Mapper->new(daemon => 1) } 1 .. $count;
+
+$0 = 'mapreduce.mapper.manager';
+
+while ($run) {
+    sleep 1;
+}
+
+exit 0;
+

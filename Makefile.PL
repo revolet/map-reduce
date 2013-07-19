@@ -6,6 +6,7 @@ author   'James Barton <james@revolet.com>';
 version  '0.15';
 license  'MIT';
 
+requires 'File::Pid'      => 0;
 requires 'Moo'            => 0;
 requires 'Redis::hiredis' => 0;
 

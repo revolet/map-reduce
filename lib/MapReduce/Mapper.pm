@@ -1,6 +1,7 @@
 package MapReduce::Mapper;
 use Moo;
 use Storable qw(nfreeze thaw);
+use MapReduce;
 
 has mappers => (
     is      => 'ro',
@@ -14,6 +15,8 @@ sub run_loop {
     my ($self) = @_;
     
     MapReduce->info( "Mapper $$ started." );
+    
+    $0 = 'mapreduce.mapper';
 
     while (1) {
         $self->run();
