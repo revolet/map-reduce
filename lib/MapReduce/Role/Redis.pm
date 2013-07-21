@@ -3,6 +3,7 @@ use Moo::Role;
 use Redis::hiredis;
 use Try::Tiny;
 use Time::HiRes;
+use MapReduce;
 
 my $redis;
 
@@ -27,7 +28,7 @@ sub redis {
         }
     }
     catch {
-        warn "Connection to redis closed.  Re-opening.  Error: $_";
+        MapReduce->debug("Connection to redis closed.  Re-opening.  Error: $_");
         $redis = $self->_new_redis;
     };
     
