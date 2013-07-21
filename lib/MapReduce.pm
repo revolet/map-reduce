@@ -45,6 +45,14 @@ has id => (
     is => 'lazy',
 );
 
+has mapper_worker => (
+    is => 'lazy',
+);
+
+has reducer_worker => (
+    is => 'lazy',
+);
+
 with 'MapReduce::Role::Redis';
 
 sub _build_id {
@@ -55,6 +63,18 @@ sub _build_id {
     MapReduce->debug( "ID is '%s'", $id );
     
     return $id;
+}
+
+sub _build_mapper_worker {
+    my ($self) = @_;
+    
+    return MapReduce::Mapper->new();
+}
+
+sub _build_reducer_worker {
+    my ($self) = @_;
+    
+    return MapReduce::Reducer->new();
 }
 
 sub BUILD {
@@ -188,6 +208,10 @@ sub next_result {
         
         if (!defined $reduced) {
             return undef if $self->done;
+
+            $self->mapper_worker->_run_mapper($self->id, $self->mapper);
+            $self->reducer_worker->_run_reducer($self->id, $self->reducer);
+
             sleep 1 if $LOGGING >= $DEBUG;
             next;
         }
