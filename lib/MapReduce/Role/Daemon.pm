@@ -7,11 +7,13 @@ has daemon => (
 );
 
 has parent_pid => (
-    is => 'rw',
+    is      => 'rw',
+    default => '',
 );
 
 has child_pid => (
-    is => 'rw',
+    is      => 'rw',
+    default => '',
 );
 
 sub BUILD {
@@ -41,7 +43,7 @@ sub is_running {
     return kill 0 => $self->child_pid;
 }
 
-sub DEMOLISH {
+sub stop {
     my ($self) = @_;
     
     return if $$ ne $self->parent_pid;
@@ -57,6 +59,12 @@ sub DEMOLISH {
     waitpid $self->child_pid, 0;
     
     MapReduce->info( "Worker %s stopped.", $self->child_pid );
+}
+
+sub DEMOLISH {
+    my ($self) = @_;
+    
+    $self->stop();
 }
 
 1;
