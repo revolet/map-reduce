@@ -14,7 +14,7 @@ $redis->select(9);
 $redis->flushdb();
 
 my $mr = MapReduce->new(
-    name => 'test1',
+    name => 'test-single-process',
     
     mapper => sub {
         my ($self, $input) = @_;

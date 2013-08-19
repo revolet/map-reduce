@@ -16,6 +16,8 @@ has child_pid => (
     default => '',
 );
 
+requires 'run';
+
 sub BUILD {
     my ($self) = @_;
     
@@ -28,8 +30,16 @@ sub BUILD {
     die 'Unable to fork child process'
         if !defined $pid;
 
-    if ($pid == 0) {       
-        $self->run_loop();
+    if ($pid == 0) {
+        my $run = 1;
+        
+        $SIG{TERM} = $SIG{INT} = sub { $run = 0 };
+        
+        while ($run) {
+            $self->run();
+        }
+        
+        exit 0;
     }
     
     $self->child_pid($pid);
@@ -49,16 +59,27 @@ sub stop {
     return if $$ ne $self->parent_pid;
        
     return if !$self->is_running;
-
-    kill 'KILL' => $self->child_pid;
     
-    MapReduce->info( "Waiting on worker %s to stop.", $self->child_pid );
-        
-    local $?;
+    MapReduce->info( 'Sending TERM to child %s.', $self->child_pid );
 
+    kill 'TERM' => $self->child_pid;
+
+    local $SIG{ALRM} = sub {
+        MapReduce->info( 'Sending KILL to unresponsive child %s.', $self->child_pid );
+        
+        kill 'KILL' => $self->child_pid;
+    };
+    
+    alarm 3;
+    
+    local $?;
+    
     waitpid $self->child_pid, 0;
     
-    MapReduce->info( "Worker %s stopped.", $self->child_pid );
+    alarm 0;
+    
+    MapReduce->info( 'Child %s exited.', $self->child_pid )
+        if !kill( 0 => $self->child_pid );
 }
 
 sub DEMOLISH {
