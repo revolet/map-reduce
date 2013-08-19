@@ -1,6 +1,7 @@
 package MapReduce::Reducer;
 use Moo;
 use Storable qw(nfreeze thaw);
+use Time::HiRes qw(usleep);
 use List::MoreUtils qw(any);
 use MapReduce;
 
@@ -12,16 +13,12 @@ has reducers => (
 with 'MapReduce::Role::Daemon';
 with 'MapReduce::Role::Redis';
 
-sub run_loop {
+sub setup {
     my ($self) = @_;
     
     MapReduce->info( "Reducer $$ started." );
     
     $0 = 'mr.reducer';
-    
-    while (1) {
-        $self->run();
-    }
 }
 
 sub run {
@@ -30,6 +27,8 @@ sub run {
     my $redis = $self->redis;
     
     my $ids = $redis->hkeys('reducer');
+    
+    my $work = 0;
             
     for my $id (@$ids) {
         if ( !exists $self->reducers->{$id} ) {
@@ -49,8 +48,10 @@ sub run {
             }
         }
         
-        $self->_run_reducer($id, $self->reducers->{$id});
+        $work += $self->_run_reducer($id, $self->reducers->{$id});
     }
+    
+    usleep 10_000 if !$work;
 }
 
 sub _run_reducer {
@@ -59,7 +60,7 @@ sub _run_reducer {
     my $redis = $self->redis;
     
     if ($redis->llen( $id.'-mapped' ) == 0) {
-        return;
+        return 0;
     }
     
     $redis->incr( $id.'-reducing' );
@@ -94,6 +95,8 @@ sub _run_reducer {
     }
 
     $redis->decr( $id.'-reducing' );
+    
+    return 1;
 }
 
 1;

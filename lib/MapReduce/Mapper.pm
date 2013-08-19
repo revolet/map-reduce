@@ -1,6 +1,7 @@
 package MapReduce::Mapper;
 use Moo;
 use Storable qw(nfreeze thaw);
+use Time::HiRes qw(usleep);
 use MapReduce;
 
 has mappers => (
@@ -11,16 +12,12 @@ has mappers => (
 with 'MapReduce::Role::Daemon';
 with 'MapReduce::Role::Redis';
 
-sub run_loop {
+sub setup {
     my ($self) = @_;
     
     MapReduce->info( "Mapper $$ started." );
     
     $0 = 'mr.mapper';
-
-    while (1) {
-        $self->run();
-    }
 }
 
 sub run {
@@ -29,6 +26,8 @@ sub run {
     my $redis = $self->redis;
     
     my $ids = $redis->hkeys('mapper');
+    
+    my $work = 0;
     
     for my $id (@$ids) {
         if ( !exists $self->mappers->{$id} ) {
@@ -48,8 +47,10 @@ sub run {
             }
         }
         
-        $self->_run_mapper($id, $self->mappers->{$id});
+        $work += $self->_run_mapper($id, $self->mappers->{$id});
     }
+    
+    usleep 10_000 if !$work;
 }
 
 sub _run_mapper {
@@ -58,7 +59,7 @@ sub _run_mapper {
     my $redis = $self->redis;
     
     if ($redis->llen( $id.'-input' ) == 0) {
-        return;
+        return 0;
     }
     
     $redis->incr( $id.'-mapping' );
@@ -67,7 +68,7 @@ sub _run_mapper {
     
     if (!defined $input) {
         $redis->decr( $id.'-mapping' );
-        return;
+        return 0;
     }
     
     my $value = thaw($input);
@@ -94,6 +95,8 @@ sub _run_mapper {
     }
     
     $redis->decr( $id.'-mapping' );
+    
+    return 1;
 }
 
 1;
