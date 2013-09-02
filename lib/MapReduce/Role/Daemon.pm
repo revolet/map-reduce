@@ -56,6 +56,8 @@ sub is_running {
 sub stop {
     my ($self) = @_;
     
+    return if !$self->daemon;
+    
     return if $$ ne $self->parent_pid;
        
     return if !$self->is_running;
@@ -84,6 +86,8 @@ sub stop {
 
 sub DEMOLISH {
     my ($self) = @_;
+    
+    return if !$self->daemon;
     
     $self->stop();
 }
