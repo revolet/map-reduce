@@ -3,13 +3,16 @@ use strict;
 use warnings;
 use Test::More;
 use Test::Deep;
-use Redis::hiredis;
+use Redis;
 use Try::Tiny;
 use MapReduce;
 
-my $redis = Redis::hiredis->new(utf8 => 0);
+my $redis = Redis->new(
+    encoding  => undef,
+    reconnect => 60,
+    server    => '127.0.0.1:6379',
+);
 
-$redis->connect('127.0.0.1', 6379);
 $redis->select(9);
 $redis->flushdb();
 
@@ -23,14 +26,6 @@ my $mr = MapReduce->new(
         
         return $input;
     },
-    
-    reducer => sub {
-        my ($self, $nums) = @_;
-        
-        my %seen;
-        
-        return [ grep { !$seen{ $_->{value} }++ } @$nums ];
-    }
 );
 
 # Load up some numbers to feed into our map-reduce functions

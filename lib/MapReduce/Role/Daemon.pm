@@ -1,5 +1,6 @@
 package MapReduce::Role::Daemon;
 use Moo::Role;
+use Try::Tiny;
 
 has daemon => (
     is      => 'ro',
@@ -31,15 +32,23 @@ sub BUILD {
         if !defined $pid;
 
     if ($pid == 0) {
-        my $run = 1;
+        $SIG{TERM} = $SIG{INT} = sub { die 'exit' };
         
-        $SIG{TERM} = $SIG{INT} = sub { $run = 0 };
-        
-        while ($run) {
-            $self->run();
+        while (1) {
+            try {
+                $self->run();
+            }
+            catch {
+                if ($_ =~ m{exit}xms) {
+                    MapReduce->info("Mapper $$ exiting.");
+                    exit 0;
+                }
+                else {
+                    MapReduce->info("Mapper $$ encountered an error: $_");
+                    sleep 1;
+                }
+            };
         }
-        
-        exit 0;
     }
     
     $self->child_pid($pid);

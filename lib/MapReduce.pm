@@ -93,126 +93,48 @@ sub BUILD {
     $SIG{TERM} = sub { exit 1 }
         if !$SIG{TERM};
     
-    $redis->hset( mapper  => ( $self->id => $mapper  ) );
-    $redis->hset( reducer => ( $self->id => $reducer ) );
-}
-
-sub input {
-    my $self = shift;
-    
-    croak 'Please surround your input operation with input_start() and input_done()'
-        if !$self->redis->get($self->id.'-inputting');
-    
-    # Support a hash or hash ref for the input
-    my $input = @_ == 1 ? shift : {@_};
-    
-    my $redis = $self->redis;
-    
-    $redis->lpush( $self->id.'-input', nfreeze($input) );
-    
-    $redis->incr( $self->id.'-input-count' );
-    $redis->incr( $self->id.'-input-total' );
-    
-    MapReduce->debug( "Pushed input '%s' to %s-input.", $input->{key}, $self->id );
-    
-    return $self;
+    $redis->setex( $self->id . '-mapper',  60*60*24, $mapper );
 }
 
 sub inputs {
     my ($self, $inputs) = @_;
     
     my $redis = $self->redis;
+    my $id    = $self->id;
     
-    $self->input_start;
-    
-    $redis->incrby( $self->id.'-input-total', scalar(@$inputs) );
+    $inputs->[-1]->{_done} = 1;
     
     for my $input (@$inputs) {
-        $redis->lpush( $self->id.'-input', nfreeze($input) );
-        $redis->incr( $self->id.'-input-count' );
+        $input->{_id} = $id;
+        
+        $redis->lpush( 'mr-inputs', nfreeze($input) );
     }
     
-    MapReduce->debug( "Pushed %d inputs %s-input.", scalar(@$inputs), $self->id );
-    
-    $self->input_done;
+    MapReduce->debug( "Pushed %d inputs.", scalar(@$inputs) );
     
     return $self;
-}
-
-sub input_start {
-    my ($self) = @_;
-    
-    $self->redis->set( $self->id.'-inputting', 1 );
-}
-
-sub input_done {
-    my ($self) = @_;
-    
-    $self->redis->del( $self->id.'-inputting' );
 }
 
 sub done {
     my ($self) = @_;
     
-    my $redis = $self->redis;
-    my $id    = $self->id;
-    
-    $redis->multi;
-    
-    $redis->llen( $id.'-input'     );
-    $redis->llen( $id.'-mapped'    );
-    $redis->llen( $id.'-reduced'   );
-    $redis->get(  $id.'-mapping'   );
-    $redis->get(  $id.'-reducing'  );
-    $redis->get(  $id.'-inputting' );
-    
-    my $values = $redis->exec;
-    
-    my $done = all { !$_ } @$values;
-    
-    MapReduce->debug( "Input queue:   %s", $values->[0] );
-    MapReduce->debug( "Mapped queue:  %s", $values->[1] );
-    MapReduce->debug( "Reduced queue: %s", $values->[2] );
-    MapReduce->debug( "Mapping?:      %s", $values->[3] );
-    MapReduce->debug( "Reducing?:     %s", $values->[4] );
-    MapReduce->debug( "Inputting?:    %s", $values->[5] );
-    
-    return $done;
-}
-
-sub DEMOLISH {
-    my ($self) = @_;
-    
-    MapReduce->debug( 'Cleaning up job keys' );
-    
-    my $redis = $self->redis;
-    my $id    = $self->id;
-
-    $redis->hdel( mapper  => $id );
-    $redis->hdel( reducer => $id );
-    
-    my $keys = $redis->keys($id.'-*');
-    
-    for my $key (@$keys) {
-        $redis->expire($key, 60);
-    }
+    return $self->redis->get( $self->id.'-done' );
 }
 
 sub next_result {
     my ($self) = @_;
     
     my $redis = $self->redis;
+    my $id    = $self->id;
     
     while (1) {
-        my $reduced = $redis->rpop( $self->id.'-reduced');
+        my $reduced = $redis->rpop( $self->id.'-mapped');
         
         if (!defined $reduced) {
             return undef if $self->done;
 
-            $self->mapper_worker->_run_mapper($self->id, $self->mapper);
-            $self->reducer_worker->_run_reducer($self->id, $self->reducer);
-
-            sleep 1 if $LOGGING >= $DEBUG;
+            $self->mapper_worker->run();
+            
             next;
         }
 
@@ -220,8 +142,6 @@ sub next_result {
         
         croak 'Reduced result is undefined?'
             if !defined $value;
-        
-        $redis->incr( $self->id.'-result-count' );
         
         return $value;
     }
@@ -270,7 +190,6 @@ sub pmap (&@) {
     my $mapper_count = $ENV{MAPREDUCE_PMAP_MAPPERS} // 4;
     
     my @mappers = map { MapReduce::Mapper->new(daemon => 1) } 1 .. $mapper_count;
-    my $reducer = MapReduce::Reducer->new(daemon => 1);
     
     my $map_reduce = MapReduce->new(
         name => 'pmap-'.time.$$.int(rand(2**31)),
@@ -287,18 +206,16 @@ sub pmap (&@) {
                 output => $output,
             };
         },
-        
-        reducer => sub { $_[1] },
     );
     
     my $key = 1;
     
     @$inputs = map { { key => $key++, value => $_ } } @$inputs;
-    
+
     $map_reduce->inputs($inputs);
-    
+
     my $results = $map_reduce->all_results;
-    
+
     my @outputs = map { $_->{output} } sort { $a->{key} <=> $b->{key} } @$results;
     
     return \@outputs;

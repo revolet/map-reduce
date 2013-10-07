@@ -1,55 +1,27 @@
 package MapReduce::Role::Redis;
 use Moo::Role;
-use Redis::hiredis;
+use Redis;
 use Try::Tiny;
 use Time::HiRes;
 use MapReduce;
 
+my $host = $ENV{MAPREDUCE_REDIS_HOST} // '127.0.0.1';
+my $port = $ENV{MAPREDUCE_REDIS_PORT} // 6379;
+my $db   = $ENV{MAPREDUCE_REDIS_DB}   // 9;
+
 my $redis;
-
-has _redis => (
-    is      => 'ro',
-    writer  => '_set_redis',
-    default => sub { $redis },
-);
-
-my $pid = '';
+my $pid = $$;
 
 sub redis {
-    my ($self) = @_;
+    return $redis if $redis && $pid eq $$;
     
-    return $self->_new_redis if $pid ne $$;
-    
-    my $redis = $self->_redis;
-    
-    try {
-        if ($redis->ping ne 'PONG') {
-            $redis = $self->_new_redis;
-        }
-    }
-    catch {
-        MapReduce->debug("Connection to redis closed.  Re-opening.  Error: $_");
-        $redis = $self->_new_redis;
-    };
-    
-    return $redis;
-}
+    $redis = Redis->new(
+        encoding  => undef,
+        reconnect => 60,
+        server    => "$host:$port",
+    );
 
-sub _new_redis {
-    my ($self) = @_;
-    
-    $redis = Redis::hiredis->new(utf8 => 0);
-    
-    my $host = $ENV{MAPREDUCE_REDIS_HOST} // '127.0.0.1';
-    my $port = $ENV{MAPREDUCE_REDIS_PORT} // 6379;
-    my $db   = $ENV{MAPREDUCE_REDIS_DB}   // 9;
-    
-    $redis->connect($host, $port);
     $redis->select($db);
-    
-    $pid = $$;
-
-    $self->_set_redis($redis);
     
     return $redis;
 }

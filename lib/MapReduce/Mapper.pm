@@ -25,78 +25,50 @@ sub run {
     
     my $redis = $self->redis;
     
-    my $ids = $redis->hkeys('mapper');
+    my ($key, $input) = $redis->brpop('mr-inputs', 1);
     
-    my $work = 0;
-    
-    for my $id (@$ids) {
-        if ( !exists $self->mappers->{$id} ) {
-            my $code = $redis->hget( mapper => $id );
-            
-            next if !$code;
-            
-            MapReduce->debug( "Got mapper for %s in process %s: %s", $id, $$, $code );
-            
-            local $@;
-            
-            {                
-                $self->mappers->{$id} = eval $code;
-                
-                die "Failed to compile mapper for $id: $@"
-                    if $@;
-            }
-        }
-        
-        $work += $self->_run_mapper($id, $self->mappers->{$id});
-    }
-    
-    usleep 10_000 if !$work;
-}
-
-sub _run_mapper {
-    my ($self, $id, $mapper) = @_;
-    
-    my $redis = $self->redis;
-    
-    if ($redis->llen( $id.'-input' ) == 0) {
-        return 0;
-    }
-    
-    $redis->incr( $id.'-mapping' );
-    
-    my $input = $redis->rpop( $id.'-input' );
-    
-    if (!defined $input) {
-        $redis->decr( $id.'-mapping' );
-        return 0;
-    }
+    return if !$key || !$input;
     
     my $value = thaw($input);
     
-    die 'Input has no key?'
-        if !exists $value->{key};
+    my $id = $value->{_id};
     
-    MapReduce->debug( "Got input '%s'", $value->{key} );
+    MapReduce->debug( "Got input '%s'", $id );
     
-    die 'Mapper is undefined? for ' . $$
-        if !defined $mapper;
-    
-    my $mapped = $mapper->($self, $value);
-    
-    if (defined $mapped) {
-        die 'Mapped value is defined but has no key?'
-            if !defined $mapped->{key};
+    if ( !exists $self->mappers->{$id} ) {
+        my $code = $redis->get($id.'-mapper');
+        
+        MapReduce->debug( "Got mapper for %s in process %s: %s", $id, $$, $code );
+        
+        local $@;
+        
+        {                
+            $self->mappers->{$id} = eval $code;
             
-        $redis->lpush( $id.'-mapped', nfreeze($mapped) );
-        
-        $redis->incr( $id.'-mapped-count' );
-        
-        MapReduce->debug( "Mapped is '%s'", $mapped->{key} );
+            die "Failed to compile mapper for $id: $@"
+                if $@;
+        }
     }
     
-    $redis->decr( $id.'-mapping' );
+    my $mapped = $self->mappers->{$id}->($self, $value);
     
-    return 1;
+    return if !defined $mapped;
+    
+    die 'Mapped value is defined but has no key?'
+        if !defined $mapped->{key};
+    
+    $mapped->{_id} = $id;
+    
+    $redis->lpush( $id.'-mapped', nfreeze($mapped) );
+    $redis->expire( $id.'-mapped', 60*60*24 );
+    
+    MapReduce->debug( "Mapped is '%s'", $mapped->{key} );
+    
+    MapReduce->debug("Job $id is done")
+        if $value->{_done};
+    
+    $redis->setex( $id.'-done', 60*60*24, 1 )
+        if $value->{_done};
 }
 
 1;
