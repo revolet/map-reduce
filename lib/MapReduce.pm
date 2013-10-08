@@ -102,7 +102,7 @@ sub inputs {
     my $redis = $self->redis;
     my $id    = $self->id;
     
-    $inputs->[-1]->{_done} = 1;
+    $redis->setex( $id.'-input-count', 60*60*24, scalar(@$inputs) );
     
     for my $input (@$inputs) {
         $input->{_id} = $id;

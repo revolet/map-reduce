@@ -27,7 +27,7 @@ sub run {
     
     my ($key, $input) = $redis->brpop('mr-inputs', 1);
     
-    return if !$key || !$input;
+    return if !$input;
     
     my $value = thaw($input);
     
@@ -61,14 +61,16 @@ sub run {
     
     $redis->lpush( $id.'-mapped', nfreeze($mapped) );
     $redis->expire( $id.'-mapped', 60*60*24 );
+    $redis->incr( $id.'-mapped-count' );
+    $redis->expire( $id.'-mapped-count', 60*60*24 );
     
     MapReduce->debug( "Mapped is '%s'", $mapped->{key} );
     
-    MapReduce->debug("Job $id is done")
-        if $value->{_done};
+    if ( $redis->get($id.'-mapped-count') >= $redis->get($id.'-input-count')) {
+        MapReduce->debug("Job $id is done");
     
-    $redis->setex( $id.'-done', 60*60*24, 1 )
-        if $value->{_done};
+        $redis->setex( $id.'-done', 60*60*24, 1 );
+    }    
 }
 
 1;
