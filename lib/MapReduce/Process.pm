@@ -2,6 +2,7 @@ package MapReduce::Process;
 use Moo;
 use Try::Tiny;
 use POSIX qw(:sys_wait_h);
+use IO::File;
 use MapReduce;
 use MapReduce::Mapper;
 
@@ -68,9 +69,11 @@ sub start {
         };
         
         $should_run = 0 if ++$iterations >= $self->max_iterations;
+        
+        $should_run = 0 if $self->_memory_usage > $self->max_memory;
     }
     
-    MapReduce->info('Mapper %s is exiting after %s iterations', $$, $iterations);
+    MapReduce->info('Mapper %s is exiting after %s iterations using %s MB memory', $$, $iterations, $self->_memory_usage);
     
     exit 0;
 }
@@ -119,6 +122,20 @@ sub stop {
     
     MapReduce->info( 'Child %s exited.', $self->child_pid )
         if !kill( 0 => $self->child_pid );
+}
+
+sub _memory_usage {
+    my ($self) = @_;
+    
+    my $fh = IO::File->new('/proc/self/status', 'r');
+    
+    my $status = join q{}, $fh->getlines();
+    
+    $fh->close();
+    
+    my ($KB) = $status =~ m{ VmRSS: \s+ (\d+) }xms;
+    
+    return int( $KB / 1024 );
 }
 
 sub DEMOLISH {
