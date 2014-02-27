@@ -1,8 +1,8 @@
 package MapReduce::Mapper;
 use Moo;
 use Storable qw(nfreeze thaw);
-use Time::HiRes qw(usleep);
 use Try::Tiny;
+use List::Util qw(shuffle);
 use MapReduce;
 
 has mappers => (
@@ -22,10 +22,22 @@ sub _next_input {
     
     my $redis = $self->redis;
     
-    return $redis->brpop('mr-inputs', 'mr-commands-'.$$, 1)
+    my @ids = $redis->smembers('mr-inputs');
+    
+    return if @ids == 0;
+    
+    for my $id (@ids) {
+        if ( !$redis->exists( $id.'-mapper' ) ) {
+            $redis->srem($id);
+        }
+    }
+    
+    my @keys = ( shuffle( map { $_.'-inputs' } @ids), 'mr-commands-'.$$ );
+    
+    return $redis->brpop(@keys, 1)
         if $self->block;
     
-    for my $key ( 'mr-inputs', 'mr-commands-'.$$ ) {
+    for my $key (@keys) {
         my $input = $redis->rpop($key);
         
         return ($key, $input) if defined $input;

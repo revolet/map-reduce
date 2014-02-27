@@ -90,10 +90,12 @@ sub inputs {
     
     $redis->setex( $id.'-input-count', 60*60*24, scalar(@$inputs) );
     
+    $redis->sadd( 'mr-inputs', $id );
+    
     for my $input (@$inputs) {
         $input->{_id} = $id;
         
-        $redis->lpush( 'mr-inputs', nfreeze($input) );
+        $redis->lpush( $id.'-inputs', nfreeze($input) );
     }
     
     MapReduce->debug( "Pushed %d inputs.", scalar(@$inputs) );
@@ -210,13 +212,16 @@ sub pmap (&@) {
 sub DEMOLISH {
     my ($self) = @_;
     
-    my $id = $self->id;
+    my $id    = $self->id;
+    my $redis = $self->redis;
     
-    $self->redis->del($id.'-input-count');
-    $self->redis->del($id.'-mapper');
-    $self->redis->del($id.'-mapped');
-    $self->redis->del($id.'-done');
-    $self->redis->del($id.'-mapped-count');
+    $redis->del($id.'-input-count');
+    $redis->del($id.'-mapper');
+    $redis->del($id.'-mapped');
+    $redis->del($id.'-done');
+    $redis->del($id.'-mapped-count');
+    
+    $redis->srem('mr-inputs', $id);
 }
 
 1;

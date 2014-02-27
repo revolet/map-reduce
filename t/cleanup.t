@@ -43,5 +43,7 @@ ok !$mr->redis->exists($id.'-done'),         "$id-done doesn't exist";
 ok !$mr->redis->exists($id.'-mapped'),       "$id-mapped doesn't exist";
 ok !$mr->redis->exists($id.'-mapped-count'), "$id-mapped-count doesn't exist";
 
+ok !$mr->redis->scard('mr-inputs'), "mr-inputs set is empty";
+
 done_testing;
 
