@@ -47,6 +47,8 @@ sub start {
         
     return $self if $pid > 0;  
     
+    MapReduce->info( 'Mapper process %s started.', $$ );
+    
     my $should_run = 1;
     
     $SIG{TERM} = $SIG{INT} = sub {
@@ -141,9 +143,12 @@ sub _memory_usage {
 sub DEMOLISH {
     my ($self) = @_;
     
-    return if $$ ne $self->parent_pid;
-    
-    $self->stop();
+    if ($$ eq $self->child_pid) {
+        $self->redis->del('mr-commands-'.$$);
+    }
+    else {    
+        $self->stop();
+    }
 }
 
 1;
