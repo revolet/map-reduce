@@ -89,7 +89,10 @@ sub run {
     
     MapReduce->debug( "Mapped is '%s'", $mapped->{key} );
     
-    if ( $redis->get($id.'-mapped-count') >= $redis->get($id.'-input-count')) {
+    my $mapped_count = $redis->get($id.'-mapped-count');
+    my $input_count  = $redis->get($id.'-input-count');
+    
+    if ( !defined $mapped_count || !defined $input_count || $mapped_count >= $input_count ) {
         MapReduce->debug("Job $id is done");
     
         $redis->setex( $id.'-done', 60*60*24, 1 );
@@ -98,6 +101,12 @@ sub run {
     }
     
     return 1;
+}
+
+sub DEMOLISH {
+    my ($self) = @_;
+    
+    $self->redis->del('mr-commands-'.$$);
 }
 
 1;

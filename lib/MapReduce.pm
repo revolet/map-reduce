@@ -77,7 +77,9 @@ sub BUILD {
     $SIG{TERM} = sub { die 'exit' }
         if !$SIG{TERM};
     
-    $redis->setex( $self->id . '-mapper',  60*60*24, $mapper );
+    my $id = $self->id;
+    
+    $redis->setex( $id.'-mapper', 60*60*24, $mapper );
 }
 
 sub inputs {
@@ -203,6 +205,18 @@ sub pmap (&@) {
     my @outputs = map { $_->{output} } sort { $a->{key} <=> $b->{key} } @$results;
     
     return \@outputs;
+}
+
+sub DEMOLISH {
+    my ($self) = @_;
+    
+    my $id = $self->id;
+    
+    $self->redis->del($id.'-input-count');
+    $self->redis->del($id.'-mapper');
+    $self->redis->del($id.'-mapped');
+    $self->redis->del($id.'-done');
+    $self->redis->del($id.'-mapped-count');
 }
 
 1;

@@ -1,8 +1,5 @@
 #!/usr/bin/env perl
-use strict;
-use warnings;
-use Test::More;
-use Test::Deep;
+use Test::Most;
 use Redis;
 use Try::Tiny;
 use MapReduce;
@@ -19,10 +16,10 @@ $redis->flushdb();
 my $mr = MapReduce->new(
     name => 'test-cleanup',
     
-    mapper => sub { sleep 10; $_[1] },
+    mapper => sub { die },
 );
 
-my @procs = map { MapReduce::Process->new()->start() } 1 .. 5;
+my @procs = map { MapReduce::Process->new(warn => 0)->start() } 1 .. 5;
 
 my @pids = map { $_->child_pid } @procs;
 

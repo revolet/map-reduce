@@ -1,6 +1,7 @@
 package MapReduce::Process;
 use Moo;
 use Try::Tiny;
+use POSIX qw(:sys_wait_h);
 use MapReduce;
 use MapReduce::Mapper;
 
@@ -22,6 +23,11 @@ has max_iterations => (
 has max_memory => (
     is      => 'ro',
     default => 256,
+);
+
+has warn => (
+    is      => 'ro',
+    default => 1,
 );
 
 with 'MapReduce::Role::Redis';
@@ -48,15 +54,23 @@ sub start {
     
     my $mapper = MapReduce::Mapper->new();
     
+    my $iterations = 0;
+    
     while ($should_run) {
         try {
             $should_run = 0 if !$mapper->run();
         }
         catch {
-            MapReduce->warn("Mapper $$ encountered an error: $_");
+            MapReduce->warn("Mapper $$ encountered an error: $_")
+                if $self->warn;
+                
             sleep 1;
         };
+        
+        $should_run = 0 if ++$iterations >= $self->max_iterations;
     }
+    
+    MapReduce->info('Mapper %s is exiting after %s iterations', $$, $iterations);
     
     exit 0;
 }
@@ -67,6 +81,10 @@ sub is_running {
     return 0 if !$self->child_pid;
     
     return 1 if $self->child_pid eq $$;
+    
+    my $pid = waitpid $self->child_pid => WNOHANG;
+    
+    return 0 if $pid && $pid eq $self->child_pid;
     
     return kill 0 => $self->child_pid;
 }
@@ -81,6 +99,7 @@ sub stop {
     MapReduce->info( 'Sending TERM to child %s.', $self->child_pid );
     
     $self->redis->rpush('mr-commands-' . $self->child_pid, 'stop');
+    $self->redis->expire('mr-commands-' . $self->child_pid, 60*60*24);
     
     kill 'TERM' => $self->child_pid;
 
