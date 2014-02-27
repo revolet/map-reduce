@@ -2,6 +2,7 @@ package MapReduce::Mapper;
 use Moo;
 use Storable qw(nfreeze thaw);
 use Time::HiRes qw(usleep);
+use Try::Tiny;
 use MapReduce;
 
 has mappers => (
@@ -25,9 +26,11 @@ sub run {
     
     my $redis = $self->redis;
     
-    my ($key, $input) = $redis->brpop('mr-inputs', 1);
+    my ($key, $input) = $redis->brpop('mr-inputs', 'mr-commands-'.$$, 1);
     
-    return if !$input;
+    return 1 if !$key || !$input;
+    
+    return 0 if $key eq 'mr-commands-'.$$ && $input eq 'exit';
     
     my $value = thaw($input);
     
@@ -50,10 +53,17 @@ sub run {
         }
     }
     
-    my $mapped = $self->mappers->{$id}->($self, $value);
+    my $mapped;
     
-    return if !defined $mapped;
+    try {
+        $mapped = $self->mappers->{$id}->($self, $value);
+    }
+    catch {
+        die "Mapper for $id died: $_";
+    };
     
+    return 1 if !defined $mapped;
+        
     die 'Mapped value is defined but has no key?'
         if !defined $mapped->{key};
     
@@ -70,7 +80,9 @@ sub run {
         MapReduce->debug("Job $id is done");
     
         $redis->setex( $id.'-done', 60*60*24, 1 );
-    }    
+    }
+    
+    return 1;
 }
 
 1;

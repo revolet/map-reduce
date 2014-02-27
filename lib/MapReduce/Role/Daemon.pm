@@ -32,23 +32,24 @@ sub BUILD {
         if !defined $pid;
 
     if ($pid == 0) {
-        $SIG{TERM} = $SIG{INT} = sub { die 'exit' };
+        my $should_run = 1;
         
-        while (1) {
+        $SIG{TERM} = $SIG{INT} = sub {
+            $should_run = 0;
+            $self->stop();
+        };
+        
+        while ($should_run) {
             try {
-                $self->run();
+                $should_run = $self->run();
             }
             catch {
-                if ($_ =~ m{exit}xms) {
-                    MapReduce->info("Mapper $$ exiting.");
-                    exit 0;
-                }
-                else {
-                    MapReduce->info("Mapper $$ encountered an error: $_");
-                    sleep 1;
-                }
+                MapReduce->info("Mapper $$ encountered an error: $_");
+                sleep 1;
             };
         }
+        
+        exit 0;
     }
     
     $self->child_pid($pid);
@@ -72,6 +73,8 @@ sub stop {
     return if !$self->is_running;
     
     MapReduce->info( 'Sending TERM to child %s.', $self->child_pid );
+    
+    $self->redis->rpush('mr-commands-' . $self->child_pid, 'exit');
 
     kill 'TERM' => $self->child_pid;
 
