@@ -7,6 +7,7 @@ use Carp qw(croak);
 use List::MoreUtils qw(all);
 use Exporter qw(import);
 use MapReduce::Mapper;
+use MapReduce::Process;
 
 our @EXPORT_OK = qw(pmap);
 
@@ -21,6 +22,7 @@ our $LOGGING = $ENV{MAPREDUCE_LOGGING} // $NONE;
 
 sub debug { shift->log('DEBUG', @_) if $LOGGING >= $DEBUG }
 sub info  { shift->log('INFO',  @_) if $LOGGING >= $INFO  }
+sub warn  { shift->log('WARN',  @_) }
 
 sub log {
     my ($class, $level, $format, @args) = @_;
@@ -58,7 +60,7 @@ sub _build_id {
 sub _build_mapper_worker {
     my ($self) = @_;
     
-    return MapReduce::Mapper->new();
+    return MapReduce::Mapper->new(block => 0);
 }
 
 sub BUILD {
@@ -169,9 +171,9 @@ sub each_result {
 sub pmap (&@) {
     my ($mapper, $inputs) = @_;
     
-    my $mapper_count = $ENV{MAPREDUCE_PMAP_MAPPERS} // 4;
+    my $proc_count = $ENV{MAPREDUCE_PMAP_MAPPERS} // 4;
     
-    my @mappers = map { MapReduce::Mapper->new(daemon => 1) } 1 .. $mapper_count;
+    my @procs = map { MapReduce::Process->new()->start() } 1 .. $proc_count;
     
     my $map_reduce = MapReduce->new(
         name => 'pmap-'.time.$$.int(rand(2**31)),

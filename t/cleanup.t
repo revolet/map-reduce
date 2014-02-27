@@ -22,15 +22,15 @@ my $mr = MapReduce->new(
     mapper => sub { sleep 10; $_[1] },
 );
 
-my @mappers = map { MapReduce::Mapper->new(daemon => 1) } 1 .. 5;
+my @procs = map { MapReduce::Process->new()->start() } 1 .. 5;
 
-my @pids = map { $_->child_pid } @mappers;
+my @pids = map { $_->child_pid } @procs;
 
 ok kill 0 => $_ for @pids;
 
 $mr->inputs([{ key => 1 }]);
 
-@mappers = ();
+@procs = ();
 
 ok !kill 0 => $_ for @pids;
 

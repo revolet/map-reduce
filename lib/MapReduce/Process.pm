@@ -1,11 +1,8 @@
-package MapReduce::Role::Daemon;
-use Moo::Role;
+package MapReduce::Process;
+use Moo;
 use Try::Tiny;
-
-has daemon => (
-    is      => 'ro',
-    default => sub { 0 },
-);
+use MapReduce;
+use MapReduce::Mapper;
 
 has parent_pid => (
     is      => 'rw',
@@ -17,12 +14,20 @@ has child_pid => (
     default => '',
 );
 
-requires 'run';
+has max_iterations => (
+    is      => 'ro',
+    default => 1000,
+);
 
-sub BUILD {
+has max_memory => (
+    is      => 'ro',
+    default => 256,
+);
+
+with 'MapReduce::Role::Redis';
+
+sub start {
     my ($self) = @_;
-    
-    return if !$self->daemon;
     
     $self->parent_pid($$);
     
@@ -30,29 +35,30 @@ sub BUILD {
     
     die 'Unable to fork child process'
         if !defined $pid;
-
-    if ($pid == 0) {
-        my $should_run = 1;
         
-        $SIG{TERM} = $SIG{INT} = sub {
-            $should_run = 0;
-            $self->stop();
-        };
+    $self->child_pid($pid || $$);
         
-        while ($should_run) {
-            try {
-                $should_run = $self->run();
-            }
-            catch {
-                MapReduce->info("Mapper $$ encountered an error: $_");
-                sleep 1;
-            };
+    return $self if $pid > 0;  
+    
+    my $should_run = 1;
+    
+    $SIG{TERM} = $SIG{INT} = sub {
+        $should_run = 0;
+    };
+    
+    my $mapper = MapReduce::Mapper->new();
+    
+    while ($should_run) {
+        try {
+            $should_run = 0 if !$mapper->run();
         }
-        
-        exit 0;
+        catch {
+            MapReduce->warn("Mapper $$ encountered an error: $_");
+            sleep 1;
+        };
     }
     
-    $self->child_pid($pid);
+    exit 0;
 }
 
 sub is_running {
@@ -60,13 +66,13 @@ sub is_running {
     
     return 0 if !$self->child_pid;
     
+    return 1 if $self->child_pid eq $$;
+    
     return kill 0 => $self->child_pid;
 }
 
 sub stop {
     my ($self) = @_;
-    
-    return if !$self->daemon;
     
     return if $$ ne $self->parent_pid;
        
@@ -74,8 +80,8 @@ sub stop {
     
     MapReduce->info( 'Sending TERM to child %s.', $self->child_pid );
     
-    $self->redis->rpush('mr-commands-' . $self->child_pid, 'exit');
-
+    $self->redis->rpush('mr-commands-' . $self->child_pid, 'stop');
+    
     kill 'TERM' => $self->child_pid;
 
     local $SIG{ALRM} = sub {
@@ -99,7 +105,7 @@ sub stop {
 sub DEMOLISH {
     my ($self) = @_;
     
-    return if !$self->daemon;
+    return if $$ ne $self->parent_pid;
     
     $self->stop();
 }

@@ -10,15 +10,28 @@ has mappers => (
     default => sub { {} },
 );
 
-with 'MapReduce::Role::Daemon';
+has block => (
+    is      => 'ro',
+    default => 1,
+);
+
 with 'MapReduce::Role::Redis';
 
-sub setup {
+sub _next_input {
     my ($self) = @_;
     
-    MapReduce->info( "Mapper $$ started." );
+    my $redis = $self->redis;
     
-    $0 = 'mr.mapper';
+    return $redis->brpop('mr-inputs', 'mr-commands-'.$$, 1)
+        if $self->block;
+    
+    for my $key ( 'mr-inputs', 'mr-commands-'.$$ ) {
+        my $input = $redis->rpop($key);
+        
+        return ($key, $input) if defined $input;
+    }
+    
+    return;
 }
 
 sub run {
@@ -26,11 +39,11 @@ sub run {
     
     my $redis = $self->redis;
     
-    my ($key, $input) = $redis->brpop('mr-inputs', 'mr-commands-'.$$, 1);
+    my ($key, $input) = $self->_next_input();
     
     return 1 if !$key || !$input;
     
-    return 0 if $key eq 'mr-commands-'.$$ && $input eq 'exit';
+    return 0 if $key eq 'mr-commands-'.$$ && $input eq 'stop';
     
     my $value = thaw($input);
     
@@ -80,6 +93,8 @@ sub run {
         MapReduce->debug("Job $id is done");
     
         $redis->setex( $id.'-done', 60*60*24, 1 );
+        
+        return 0;
     }
     
     return 1;

@@ -15,11 +15,11 @@ my $redis = Redis->new(
 $redis->select(9);
 $redis->flushdb();
 
-# Start up 5 mapper processes
-my %mappers;
+# Start up 5 mapreduce processes
+my %procs;
 
 for (1..5) {
-    $mappers{$_} = MapReduce::Mapper->new(daemon => 1);
+    $procs{$_} = MapReduce::Process->new()->start();
 }
 
 my $mr = MapReduce->new(
