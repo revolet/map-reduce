@@ -7,7 +7,6 @@ use Carp qw(croak);
 use List::MoreUtils qw(all);
 use Exporter qw(import);
 use MapReduce::Mapper;
-use MapReduce::Reducer;
 
 our @EXPORT_OK = qw(pmap);
 
@@ -36,20 +35,11 @@ has [ qw( name mapper ) ] => (
     required => 1,
 );
 
-has reducer => (
-    is      => 'ro',
-    default => sub { sub { $_[1] } },
-);
-
 has id => (
     is => 'lazy',
 );
 
 has mapper_worker => (
-    is => 'lazy',
-);
-
-has reducer_worker => (
     is => 'lazy',
 );
 
@@ -71,26 +61,18 @@ sub _build_mapper_worker {
     return MapReduce::Mapper->new();
 }
 
-sub _build_reducer_worker {
-    my ($self) = @_;
-    
-    return MapReduce::Reducer->new();
-}
-
 sub BUILD {
     my ($self) = @_;
     
-    my $mapper  = ref $self->mapper  ? Dump( $self->mapper  )->Declare(1)->Out() : $self->mapper;
-    my $reducer = ref $self->reducer ? Dump( $self->reducer )->Declare(1)->Out() : $self->reducer;
-    my $redis   = $self->redis;
+    my $mapper = ref $self->mapper ? Dump( $self->mapper )->Declare(1)->Out() : $self->mapper;
+    my $redis  = $self->redis;
     
     MapReduce->debug( "Mapper is '%s'",  $mapper );
-    MapReduce->debug( "Reducer is '%s'", $reducer );
    
-    $SIG{INT} = sub { exit 1 }
+    $SIG{INT} = sub { die 'exit' }
         if !$SIG{INT};
         
-    $SIG{TERM} = sub { exit 1 }
+    $SIG{TERM} = sub { die 'exit' }
         if !$SIG{TERM};
     
     $redis->setex( $self->id . '-mapper',  60*60*24, $mapper );
