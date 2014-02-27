@@ -38,6 +38,7 @@ my $id = $mr->id;
 
 ok !$mr->redis->exists('mr-commands-'.$_),   "mr-commands-$_ doesn't exist" for @pids;
 ok !$mr->redis->exists($id.'-input-count'),  "$id-input-count doesn't exist";
+ok !$mr->redis->exists($id.'-inputs'),       "$id-inputs doesn't exist";
 ok !$mr->redis->exists($id.'-mapper'),       "$id-mapper doesn't exist";
 ok !$mr->redis->exists($id.'-done'),         "$id-done doesn't exist";
 ok !$mr->redis->exists($id.'-mapped'),       "$id-mapped doesn't exist";

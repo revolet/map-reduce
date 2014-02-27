@@ -215,6 +215,7 @@ sub DEMOLISH {
     my $id    = $self->id;
     my $redis = $self->redis;
     
+    $redis->del($id.'-inputs');
     $redis->del($id.'-input-count');
     $redis->del($id.'-mapper');
     $redis->del($id.'-mapped');
