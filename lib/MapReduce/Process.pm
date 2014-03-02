@@ -3,6 +3,7 @@ use Moo;
 use Try::Tiny;
 use POSIX qw(:sys_wait_h);
 use IO::File;
+use Time::HiRes qw(sleep);
 use MapReduce;
 use MapReduce::Mapper;
 
@@ -87,10 +88,6 @@ sub is_running {
     
     return 1 if $self->child_pid eq $$;
     
-    my $pid = waitpid $self->child_pid => WNOHANG;
-    
-    return 0 if $pid && $pid eq $self->child_pid;
-    
     return kill 0 => $self->child_pid;
 }
 
@@ -104,26 +101,37 @@ sub stop {
     MapReduce->info( 'Sending TERM to child %s.', $self->child_pid );
     
     $self->redis->rpush('mr-commands-' . $self->child_pid, 'stop');
-    $self->redis->expire('mr-commands-' . $self->child_pid, 60*60*24);
+    $self->redis->expire('mr-commands-' . $self->child_pid, 60*60);
     
     kill 'TERM' => $self->child_pid;
-
-    local $SIG{ALRM} = sub {
-        MapReduce->info( 'Sending KILL to unresponsive child %s.', $self->child_pid );
+    
+    for (1..300) {
+        waitpid $self->child_pid, WNOHANG;
         
-        kill 'KILL' => $self->child_pid;
-    };
+        if (!kill 0 => $self->child_pid) {
+            MapReduce->info( 'Child %s exited.', $self->child_pid );
+            return;
+        }
+        
+        sleep 0.01;
+    }
+
+    MapReduce->info( 'Sending KILL to unresponsive child %s.', $self->child_pid );
+        
+    kill 'KILL' => $self->child_pid;
     
-    alarm 3;
+    for (1..300) {
+        waitpid $self->child_pid, WNOHANG;
+        
+        if (!kill 0 => $self->child_pid) {
+            MapReduce->info( 'Child %s exited.', $self->child_pid );
+            return;
+        }
+        
+        sleep 0.01;
+    }
     
-    local $?;
-    
-    waitpid $self->child_pid, 0;
-    
-    alarm 0;
-    
-    MapReduce->info( 'Child %s exited.', $self->child_pid )
-        if !kill( 0 => $self->child_pid );
+    MapReduce->info( 'Child %s could not be terminated.', $self->child_pid );
 }
 
 sub _memory_usage {

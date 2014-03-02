@@ -26,12 +26,6 @@ sub _next_input {
     
     return if @ids == 0;
     
-    for my $id (@ids) {
-        if ( !$redis->exists( $id.'-mapper' ) ) {
-            $redis->srem($id);
-        }
-    }
-    
     my @keys = ( shuffle( map { $_.'-inputs' } @ids), 'mr-commands-'.$$ );
     
     return $redis->brpop(@keys, 1)
@@ -65,6 +59,11 @@ sub run {
     
     if ( !exists $self->mappers->{$id} ) {
         my $code = $redis->get($id.'-mapper');
+        
+        if (!$code) {
+            $redis->lpush($id.'-inputs', $input);
+            return 1;
+        }
         
         MapReduce->debug( "Got mapper for %s in process %s: %s", $id, $$, $code );
         

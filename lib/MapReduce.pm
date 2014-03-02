@@ -41,6 +41,11 @@ has id => (
     is => 'lazy',
 );
 
+has self_mapper => (
+    is      => 'ro',
+    default => 1,
+);
+
 has mapper_worker => (
     is => 'lazy',
 );
@@ -71,10 +76,10 @@ sub BUILD {
     
     MapReduce->debug( "Mapper is '%s'",  $mapper );
    
-    $SIG{INT} = sub { die 'exit' }
+    $SIG{INT} = sub { exit 1 }
         if !$SIG{INT};
         
-    $SIG{TERM} = sub { die 'exit' }
+    $SIG{TERM} = sub { exit 1 }
         if !$SIG{TERM};
     
     my $id = $self->id;
@@ -121,7 +126,8 @@ sub next_result {
         if (!defined $reduced) {
             return undef if $self->done;
 
-            $self->mapper_worker->run();
+            $self->mapper_worker->run()
+                if $self->self_mapper;
             
             next;
         }
@@ -209,11 +215,17 @@ sub pmap (&@) {
     return \@outputs;
 }
 
+my $parent_pid = $$;
+
 sub DEMOLISH {
     my ($self) = @_;
     
+    return if $$ ne $parent_pid;
+    
     my $id    = $self->id;
     my $redis = $self->redis;
+    
+    $redis->srem('mr-inputs', $id);
     
     $redis->del($id.'-inputs');
     $redis->del($id.'-input-count');
@@ -221,8 +233,6 @@ sub DEMOLISH {
     $redis->del($id.'-mapped');
     $redis->del($id.'-done');
     $redis->del($id.'-mapped-count');
-    
-    $redis->srem('mr-inputs', $id);
 }
 
 1;
