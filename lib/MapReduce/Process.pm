@@ -88,6 +88,8 @@ sub is_running {
     
     return 1 if $self->child_pid eq $$;
     
+    waitpid $self->child_pid, WNOHANG;
+    
     return kill 0 => $self->child_pid;
 }
 
