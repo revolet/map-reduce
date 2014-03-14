@@ -33,13 +33,18 @@ ok !kill 0 => $_ for @pids;
 
 my $id = $mr->id;
 
-ok !$mr->redis->exists('mr-commands-'.$_),   "mr-commands-$_ doesn't exist" for @pids;
-ok !$mr->redis->exists($id.'-inputs'),       "$id-inputs doesn't exist";
-ok !$mr->redis->exists($id.'-input-count'),  "$id-input-count doesn't exist";
-ok !$mr->redis->exists($id.'-mapper'),       "$id-mapper doesn't exist";
-ok !$mr->redis->exists($id.'-done'),         "$id-done doesn't exist";
-ok !$mr->redis->exists($id.'-mapped'),       "$id-mapped doesn't exist";
-ok !$mr->redis->exists($id.'-mapped-count'), "$id-mapped-count doesn't exist";
+ok !$redis->exists('mr-commands-'.$_),   "mr-commands-$_ doesn't exist" for @pids;
+
+$mr = undef;
+
+ok !$redis->exists($id.'-inputs'),       "$id-inputs doesn't exist";
+ok !$redis->exists($id.'-input-count'),  "$id-input-count doesn't exist";
+ok !$redis->exists($id.'-mapper'),       "$id-mapper doesn't exist";
+ok !$redis->exists($id.'-done'),         "$id-done doesn't exist";
+ok !$redis->exists($id.'-mapped'),       "$id-mapped doesn't exist";
+ok !$redis->exists($id.'-mapped-count'), "$id-mapped-count doesn't exist";
+
+ok !$redis->scard('mr-inputs'), "mr-inputs set is empty";
 
 done_testing;
 
