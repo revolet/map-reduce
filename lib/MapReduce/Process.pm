@@ -24,7 +24,7 @@ has max_iterations => (
 
 has max_memory => (
     is      => 'ro',
-    default => 256,
+    default => 384,
 );
 
 has warn => (
@@ -105,7 +105,7 @@ sub stop {
     
     kill 'TERM' => $self->child_pid;
     
-    for (1..300) {
+    for (1..3000) {
         waitpid $self->child_pid, WNOHANG;
         
         if (!kill 0 => $self->child_pid) {

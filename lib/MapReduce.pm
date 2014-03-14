@@ -2,7 +2,7 @@ package MapReduce;
 use Moo;
 use Storable qw(nfreeze thaw);
 use Data::Dump::Streamer qw(Dump);
-use Time::HiRes qw(time);
+use Time::HiRes qw(time sleep);
 use Carp qw(croak);
 use List::MoreUtils qw(all);
 use Exporter qw(import);
@@ -48,6 +48,11 @@ has self_mapper => (
 
 has mapper_worker => (
     is => 'lazy',
+);
+
+has timeout => (
+    is      => 'ro',
+    default => 60,
 );
 
 with 'MapReduce::Role::Redis';
@@ -119,15 +124,23 @@ sub next_result {
     
     my $redis = $self->redis;
     my $id    = $self->id;
+    my $count = 0;
+    my $start = time;
     
     while (1) {
         my $reduced = $redis->rpop( $self->id.'-mapped');
         
         if (!defined $reduced) {
             return undef if $self->done;
+            
+            return undef if time - $start >= $self->timeout;
 
             $self->mapper_worker->run()
                 if $self->self_mapper;
+            
+            sleep $count * ( 1 / $self->timeout );
+            
+            $count++;
             
             next;
         }
@@ -171,7 +184,6 @@ sub each_result {
         
         if (!defined $result) {
             last if $self->done;
-            next;
         }
         
         $callback->($result);
