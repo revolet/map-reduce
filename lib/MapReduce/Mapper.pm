@@ -15,6 +15,11 @@ has block => (
     default => 1,
 );
 
+has timeout => (
+    is      => 'ro',
+    default => 120,
+);
+
 with 'MapReduce::Role::Redis';
 
 sub _next_input {
@@ -26,7 +31,21 @@ sub _next_input {
     
     return if @ids == 0;
     
-    my @keys = ( shuffle( map { $_.'-inputs' } @ids), 'mr-commands-'.$$ );
+    my %alive_ids = map { $_ => 1 } grep { $redis->get($_.'-alive') } @ids;
+    my %dead_ids  = map { $_ => 1 } grep { !$alive_ids{$_} } @ids;
+    
+    for my $id (keys %dead_ids) {
+        $redis->srem('mr-inputs', $id);
+        
+        $redis->del($id.'-inputs');
+        $redis->del($id.'-input-count');
+        $redis->del($id.'-mapper');
+        $redis->del($id.'-mapped');
+        $redis->del($id.'-done');
+        $redis->del($id.'-mapped-count');
+    }
+    
+    my @keys = ( shuffle( map { $_.'-inputs' } keys %alive_ids), 'mr-commands-'.$$ );
     
     return $redis->brpop(@keys, 1)
         if $self->block;

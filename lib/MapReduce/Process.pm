@@ -32,6 +32,16 @@ has warn => (
     default => 1,
 );
 
+has timeout => (
+    is      => 'ro',
+    default => 120,
+);
+
+has block => (
+    is      => 'ro',
+    default => 1,
+);
+
 with 'MapReduce::Role::Redis';
 
 sub start {
@@ -56,7 +66,7 @@ sub start {
         $should_run = 0;
     };
     
-    my $mapper = MapReduce::Mapper->new();
+    my $mapper = MapReduce::Mapper->new(timeout => $self->timeout, block => $self->block);
     
     my $iterations = 0;
     

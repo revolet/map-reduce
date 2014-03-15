@@ -38,7 +38,8 @@ has [ qw( name mapper ) ] => (
 );
 
 has id => (
-    is => 'lazy',
+    is     => 'lazy',
+    writer => '_set_id',
 );
 
 has self_mapper => (
@@ -90,6 +91,7 @@ sub BUILD {
     my $id = $self->id;
     
     $redis->setex( $id.'-mapper', 60*60*24, $mapper );
+    $redis->setex( $id.'-alive', 120, 1 );
 }
 
 sub inputs {
@@ -106,6 +108,8 @@ sub inputs {
         $input->{_id} = $id;
         
         $redis->lpush( $id.'-inputs', nfreeze($input) );
+        
+        $redis->setex( $id.'-alive', 120, 1 );
     }
     
     MapReduce->debug( "Pushed %d inputs.", scalar(@$inputs) );
@@ -128,6 +132,8 @@ sub next_result {
     my $start = time;
     
     while (1) {
+        $redis->setex( $id.'-alive', 120, 1 );
+        
         my $reduced = $redis->rpop( $self->id.'-mapped');
         
         if (!defined $reduced) {
@@ -236,6 +242,8 @@ sub DEMOLISH {
     
     my $id    = $self->id;
     my $redis = $self->redis;
+    
+    $redis->del($id.'-alive');
     
     $redis->srem('mr-inputs', $id);
     
