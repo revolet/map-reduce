@@ -190,6 +190,7 @@ sub each_result {
         
         if (!defined $result) {
             last if $self->done;
+            next;
         }
         
         $callback->($result);

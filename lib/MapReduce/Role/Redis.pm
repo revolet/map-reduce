@@ -7,7 +7,7 @@ use MapReduce;
 
 my $host = $ENV{MAPREDUCE_REDIS_HOST} // '127.0.0.1';
 my $port = $ENV{MAPREDUCE_REDIS_PORT} // 6379;
-my $db   = $ENV{MAPREDUCE_REDIS_DB}   // 9;
+my $db   = $ENV{MAPREDUCE_REDIS_DB}   // 7;
 
 my $redis;
 my $pid = $$;

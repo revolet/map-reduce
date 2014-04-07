@@ -29,7 +29,10 @@ sub _next_input {
     
     my @ids = $redis->smembers('mr-inputs');
     
-    return if @ids == 0;
+    if (@ids == 0) {
+        MapReduce->info('Sleeping because there is no work.');
+        sleep 1;
+    }
     
     my %alive_ids = map { $_ => 1 } grep { $redis->get($_.'-alive') } @ids;
     my %dead_ids  = map { $_ => 1 } grep { !$alive_ids{$_} } @ids;
