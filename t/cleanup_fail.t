@@ -4,6 +4,8 @@ use Redis;
 use Try::Tiny;
 use MapReduce;
 
+$ENV{MAPREDUCE_REDIS_DB} = 9;
+
 my $redis = Redis->new(
     encoding  => undef,
     reconnect => 60,

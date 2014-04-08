@@ -7,6 +7,8 @@ use Time::HiRes qw(sleep);
 use Redis;
 use MapReduce;
 
+$ENV{MAPREDUCE_REDIS_DB} = 9;
+
 my $redis = Redis->new(
     encoding  => undef,
     reconnect => 60,

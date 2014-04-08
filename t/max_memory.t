@@ -6,6 +6,8 @@ use Test::Deep;
 use Redis;
 use MapReduce;
 
+$ENV{MAPREDUCE_REDIS_DB} = 9;
+
 my $redis = Redis->new(
     encoding  => undef,
     reconnect => 60,
@@ -30,7 +32,7 @@ my $mr = MapReduce->new(
         
         $input->{key} *= 2;
         
-        $self->{junk} .= '0' x (1024*1024*4);
+        $self->{junk} .= '0' x (1024*1024*16);
         
         return $input;
     },
@@ -42,6 +44,8 @@ ok $_->is_running for values %procs;
 $mr->inputs([ map { { key => $_ } } 1 .. 50 ]);
 
 $mr->all_results;
+
+sleep 5;
 
 ok !$_->is_running for values %procs;
 

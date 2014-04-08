@@ -6,6 +6,8 @@ use Test::Deep;
 use Redis;
 use MapReduce qw(pmap);
 
+$ENV{MAPREDUCE_REDIS_DB} = 9;
+
 my $redis = Redis->new(
     encoding  => undef,
     reconnect => 60,
