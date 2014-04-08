@@ -34,6 +34,8 @@ $mr->inputs([ map { { key => $_ } } 1 .. 50 ]);
 
 @procs = ();
 
+sleep 2;
+
 ok !kill 0 => $_ for @pids;
 
 my $id = $mr->id;
